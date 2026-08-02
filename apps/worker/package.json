@@ -1,0 +1,29 @@
+{
+  "name": "@vnsf/worker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1101.0",
+    "@vnsf/config": "workspace:*",
+    "bullmq": "5.56.5",
+    "file-type": "^22.0.1",
+    "ioredis": "5.6.1",
+    "pg": "8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.0.10",
+    "@types/pg": "8.15.4",
+    "tsx": "4.20.3",
+    "typescript": "5.8.3",
+    "vitest": "3.2.4"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@vnsf/contracts",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "validate": "redocly lint openapi.yaml",
+    "build": "redocly bundle openapi.yaml --output dist/openapi.yaml",
+    "typecheck": "redocly lint openapi.yaml",
+    "test": "redocly lint openapi.yaml",
+    "lint": "redocly lint openapi.yaml"
+  },
+  "devDependencies": {
+    "@redocly/cli": "1.34.3"
+  }
+}

@@ -1,0 +1,1135 @@
+openapi: 3.1.0
+info:
+  title: VNSF Scholarship Management API
+  version: 0.1.0
+  license: { name: Proprietary, identifier: LicenseRef-Proprietary }
+servers:
+  - url: /api/v1
+security: [{ sessionCookie: [] }]
+paths:
+  /auth/login:
+    post:
+      summary: Authenticate and start a rotated session
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password:
+                  {
+                    type: string,
+                    minLength: 8,
+                    maxLength: 200,
+                    format: password,
+                  }
+      responses:
+        "200": { description: Session cookie and MFA requirement }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { description: Actor or IP rate limit exceeded }
+  /auth/mfa/verify:
+    post:
+      summary: Verify TOTP for a pending administrative session
+      operationId: verifyMfa
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code]
+              properties: { code: { type: string, pattern: "^\\d{6}$" } }
+      responses:
+        "200": { description: MFA verified }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/logout:
+    post:
+      summary: Revoke the current session
+      operationId: logout
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { description: Session revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/sessions:
+    get:
+      summary: List active sessions owned by the current user
+      operationId: listSessions
+      responses:
+        "200": { description: Active sessions without token material }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/sessions/{id}:
+    delete:
+      summary: Revoke an owned session
+      operationId: revokeSession
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+      responses:
+        "200": { description: Session revoked }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /auth/password/forgot:
+    post:
+      summary: Request password reset without disclosing account existence
+      operationId: requestPasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email]
+              properties: { email: { type: string, format: email } }
+      responses:
+        "200": { description: Request accepted regardless of account existence }
+        "429": { description: Actor or IP rate limit exceeded }
+  /auth/password/reset:
+    post:
+      summary: Consume a one-time password reset token
+      operationId: resetPassword
+      security: []
+      requestBody: { $ref: "#/components/requestBodies/TokenPassword" }
+      responses:
+        "200": { description: Password changed and sessions revoked }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /auth/activate:
+    post:
+      summary: Activate an account using a one-time token
+      operationId: activateAccount
+      security: []
+      requestBody: { $ref: "#/components/requestBodies/TokenPassword" }
+      responses:
+        "200": { description: Account activated }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /auth/reauthenticate:
+    post:
+      summary: Re-authenticate before a sensitive operation
+      operationId: reauthenticate
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [password]
+              properties:
+                {
+                  password:
+                    {
+                      type: string,
+                      minLength: 12,
+                      maxLength: 200,
+                      format: password,
+                    },
+                }
+      responses:
+        "200": { description: Re-authentication valid for five minutes }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/mfa/enroll:
+    post:
+      summary: Begin TOTP enrollment for the current user
+      operationId: beginMfaEnrollment
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email]
+              properties: { email: { type: string, format: email } }
+      responses:
+        "200": { description: TOTP provisioning URI }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/mfa/enroll/confirm:
+    post:
+      summary: Confirm TOTP enrollment and issue recovery codes once
+      operationId: confirmMfaEnrollment
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code]
+              properties: { code: { type: string, pattern: "^\\d{6}$" } }
+      responses:
+        "200": { description: One-time recovery code list }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/mfa/recovery/verify:
+    post:
+      summary: Consume one MFA recovery code
+      operationId: verifyMfaRecoveryCode
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code]
+              properties:
+                { code: { type: string, minLength: 8, maxLength: 64 } }
+      responses:
+        "200": { description: MFA verified and recovery code consumed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /health/live:
+    get:
+      summary: Check process liveness
+      operationId: getLiveness
+      security: []
+      responses:
+        "200":
+          description: Process is live
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /students/{studentId}/bank-account:
+    parameters: [{ $ref: "#/components/parameters/StudentId" }]
+    get:
+      summary: Read the active bank account with protected fields masked
+      operationId: getBankAccount
+      responses:
+        "200": { description: Masked active bank account }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      summary: Create or replace the caller's own encrypted bank account
+      operationId: saveBankAccount
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/IfMatch" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BankAccountInput" }
+      responses:
+        "200": { description: Masked pending-review account }
+        "412": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /students/{studentId}/bank-account/review:
+    parameters: [{ $ref: "#/components/parameters/StudentId" }]
+    patch:
+      summary: Validate or reject a pending bank account
+      operationId: reviewBankAccount
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/IfMatch" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BankReviewInput" }
+      responses:
+        "200": { description: Masked reviewed account }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "412": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+  /students/{studentId}/bank-account/reveal:
+    parameters: [{ $ref: "#/components/parameters/StudentId" }]
+    patch:
+      summary: Reveal bank fields after re-authentication and append an audit event
+      operationId: revealBankAccount
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [purpose]
+              properties:
+                purpose: { type: string, minLength: 10, maxLength: 500 }
+      responses:
+        "200": { description: Full bank fields for immediate authorized use }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /health/ready:
+    get:
+      summary: Check dependency readiness
+      operationId: getReadiness
+      security: []
+      responses:
+        "200":
+          description: Dependencies are ready
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthResponse" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /students:
+    get:
+      summary: List students in the caller data scope
+      operationId: listStudents
+      parameters:
+        - {
+            in: query,
+            name: page,
+            schema: { type: integer, minimum: 1, default: 1 },
+          }
+        - {
+            in: query,
+            name: size,
+            schema: { type: integer, minimum: 1, maximum: 100, default: 20 },
+          }
+      responses:
+        "200": { description: Scoped student page }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Create a student after duplicate checks
+      operationId: createStudent
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StudentInput" }
+      responses:
+        "200": { description: Student created }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /configuration/{kind}:
+    parameters:
+      - in: path
+        name: kind
+        required: true
+        schema: { type: string, enum: [schools, programs, periods, calendar] }
+    get:
+      summary: List operational configuration records
+      operationId: listConfiguration
+      responses:
+        "200":
+          {
+            description: Configuration records visible to an authorized manager,
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Create an operational configuration record
+      operationId: createConfiguration
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConfigurationInput" }
+      responses:
+        "200": { description: Created configuration record }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /configuration/{kind}/{id}:
+    patch:
+      summary: Optimistically update an operational configuration record
+      operationId: updateConfiguration
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema: { type: string, enum: [schools, programs, periods, calendar] }
+        - { $ref: "#/components/parameters/ResourceId" }
+        - { $ref: "#/components/parameters/IfMatch" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConfigurationInput" }
+      responses:
+        "200": { description: Updated configuration record }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "412": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+  /students/{id}:
+    get:
+      summary: Get a field-filtered student
+      operationId: getStudent
+      parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+      responses:
+        {
+          "200": { description: Masked field-policy detail },
+          "404": { $ref: "#/components/responses/NotFound" },
+        }
+    patch:
+      summary: Update allowed student fields
+      operationId: updateStudent
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ResourceId" }
+        - { $ref: "#/components/parameters/IfMatch" }
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/StudentPatch" } },
+          }
+      responses:
+        "200": { description: Updated student }
+        "412": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+  /students/duplicates/check:
+    get:
+      summary: Find scoped exact duplicate candidates by normalized name and birth date
+      operationId: checkStudentDuplicates
+      parameters:
+        - {
+            in: query,
+            name: full_name,
+            required: true,
+            schema: { type: string, minLength: 2, maxLength: 150 },
+          }
+        - {
+            in: query,
+            name: date_of_birth,
+            required: true,
+            schema: { type: string, format: date },
+          }
+      responses:
+        "200": { description: Scoped duplicate candidates }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /students/{id}/guardians:
+    parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+    get:
+      summary: List guardians with masked contact details
+      operationId: listStudentGuardians
+      responses:
+        "200": { description: Guardian list with masked contacts }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Add an encrypted guardian contact
+      operationId: addStudentGuardian
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/GuardianInput" } },
+          }
+      responses:
+        "200": { description: Guardian created with masked contact }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /students/{id}/school-history:
+    get:
+      summary: List immutable school assignments for a scoped student
+      operationId: listStudentSchoolHistory
+      parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+      responses:
+        "200": { description: Effective-dated school history }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /students/{id}/school-transfer:
+    post:
+      summary: Atomically transfer a student and append history/profile versions
+      operationId: transferStudentSchool
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ResourceId" }
+        - { $ref: "#/components/parameters/IfMatch" }
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  { $ref: "#/components/schemas/StudentSchoolTransferInput" },
+              },
+          }
+      responses:
+        "200": { description: Transferred student }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "412": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+  /submissions/{id}/submit:
+    post:
+      summary: Submit an immutable academic version
+      operationId: submitAcademicSubmission
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/ResourceId" },
+          { $ref: "#/components/parameters/IdempotencyKey" },
+        ]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    {
+                      type: object,
+                      required: [version],
+                      properties: { version: { type: integer, minimum: 1 } },
+                    },
+                },
+            },
+        }
+      responses:
+        "200": { description: Immutable submitted version and receipt }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /submissions:
+    get:
+      summary: List submissions in the caller student or review scope
+      operationId: listAcademicSubmissions
+      parameters:
+        [{ in: query, name: queue, schema: { type: boolean, default: false } }]
+      responses:
+        "200": { description: Scoped submissions or open review queue }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Create a unique draft submission
+      operationId: createAcademicSubmission
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema: { $ref: "#/components/schemas/SubmissionCreateInput" },
+              },
+          }
+      responses:
+        "200": { description: Draft submission created }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /submissions/{id}/draft:
+    patch:
+      summary: Optimistically save mutable draft data
+      operationId: saveAcademicDraft
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ResourceId" }
+        - { $ref: "#/components/parameters/IfMatch" }
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/SubmissionDraftInput" } },
+          }
+      responses:
+        "200": { description: Draft saved }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "412": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+  /submissions/{id}/review:
+    post:
+      summary: Complete the current scoped review task
+      operationId: reviewAcademicSubmission
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ResourceId" }
+        - { $ref: "#/components/parameters/IfMatch" }
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema: { $ref: "#/components/schemas/SubmissionReviewInput" },
+              },
+          }
+      responses:
+        "200": { description: Review decision applied }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "412": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /students/{studentId}/education-expenses/{academicYear}:
+    parameters:
+      - { $ref: "#/components/parameters/StudentId" }
+      - { $ref: "#/components/parameters/AcademicYear" }
+    get:
+      summary: Read a scoped yearly education-expense record
+      operationId: getEducationExpense
+      responses:
+        "200": { description: Expense record }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      summary: Create or optimistically update an editable expense record
+      operationId: saveEducationExpense
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/IfMatch" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EducationExpenseInput" }
+      responses:
+        "200": { description: Saved expense draft }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "412": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+  /students/{studentId}/education-expenses/{academicYear}/{action}:
+    parameters:
+      - { $ref: "#/components/parameters/StudentId" }
+      - { $ref: "#/components/parameters/AcademicYear" }
+      - in: path
+        name: action
+        required: true
+        schema: { type: string, enum: [submit, return, confirm, correct] }
+    post:
+      summary: Apply an idempotent expense workflow transition
+      operationId: transitionEducationExpense
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/IfMatch" }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason: { type: string, minLength: 10, maxLength: 1000 }
+      responses:
+        "200": { description: Transition applied and version appended }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "412": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+  /students/{studentId}/support-programs:
+    parameters: [{ $ref: "#/components/parameters/StudentId" }]
+    get:
+      summary: List active support occurrences in student scope
+      operationId: listStudentSupportPrograms
+      responses:
+        "200": { description: Support occurrence list }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Add a support-program occurrence
+      operationId: createStudentSupportProgram
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StudentSupportInput" }
+      responses:
+        "200": { description: Support occurrence created }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /students/{studentId}/support-programs/catalog:
+    get:
+      summary: List active support-program catalog entries
+      operationId: listSupportProgramCatalog
+      parameters: [{ $ref: "#/components/parameters/StudentId" }]
+      responses:
+        "200": { description: Localized support catalog }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /students/{studentId}/support-programs/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/StudentId" }
+      - { $ref: "#/components/parameters/ResourceId" }
+    put:
+      summary: Optimistically update a support occurrence
+      operationId: updateStudentSupportProgram
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/IfMatch" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StudentSupportInput" }
+      responses:
+        "200": { description: Support occurrence updated }
+        "412": { $ref: "#/components/responses/Conflict" }
+    delete:
+      summary: Archive a support occurrence while preserving history
+      operationId: archiveStudentSupportProgram
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/IfMatch" }]
+      responses:
+        "200": { description: Support occurrence archived }
+        "412": { $ref: "#/components/responses/Conflict" }
+  /manual-transfers:
+    get:
+      summary: List transfers in the caller's program, school or student scope
+      operationId: listManualTransfers
+      responses:
+        "200": { description: Scoped transfer page }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Record an externally executed transfer
+      operationId: createManualTransfer
+      description: Records an external transfer; never initiates payment.
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema: { $ref: "#/components/schemas/ManualTransferInput" },
+                },
+            },
+        }
+      responses:
+        "200": { description: Awaiting student confirmation }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /manual-transfers/{id}:
+    get:
+      summary: Read a scoped transfer with confirmation and correction evidence
+      operationId: getManualTransfer
+      parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+      responses:
+        "200": { description: Transfer detail }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /manual-transfers/{id}/confirm:
+    post:
+      summary: Confirm receipt or report non-receipt as the linked student
+      operationId: confirmManualTransfer
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ResourceId" }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TransferConfirmationInput" }
+      responses:
+        "200": { description: Confirmation recorded append-only }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /manual-transfers/{id}/corrections:
+    post:
+      summary: Mark the original corrected and create an immutable replacement
+      operationId: correctManualTransfer
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ResourceId" }
+        - { $ref: "#/components/parameters/IfMatch" }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TransferCorrectionInput" }
+      responses:
+        "200": { description: Replacement transfer created }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "412": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+  /documents/upload-init:
+    post:
+      summary: Create a private quarantine upload with a short-lived signed URL
+      operationId: initiateDocumentUpload
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/DocumentUploadInput" } },
+          }
+      responses:
+        "200":
+          { description: Signed quarantine upload URL and required headers }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /documents/{id}/complete:
+    post:
+      summary: Verify object metadata and magic bytes then enqueue antivirus scan
+      operationId: completeDocumentUpload
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+      responses:
+        "200": { description: Document pending antivirus scan }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /documents/{id}/download:
+    get:
+      summary: Get a short-lived download URL for an authorized clean document
+      operationId: downloadDocument
+      parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+      responses:
+        "200": { description: Five-minute private download URL }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: vnsf_session
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+  requestBodies:
+    TokenPassword:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [token, password]
+            properties:
+              token: { type: string, minLength: 32, maxLength: 200 }
+              password:
+                {
+                  type: string,
+                  minLength: 12,
+                  maxLength: 200,
+                  format: password,
+                }
+  parameters:
+    AcademicYear:
+      {
+        in: path,
+        name: academicYear,
+        required: true,
+        schema: { type: string, pattern: "^20[0-9]{2}-20[0-9]{2}$" },
+      }
+    StudentId:
+      {
+        in: path,
+        name: studentId,
+        required: true,
+        schema: { type: string, format: uuid },
+      }
+    ResourceId:
+      {
+        in: path,
+        name: id,
+        required: true,
+        schema: { type: string, format: uuid },
+      }
+    IfMatch:
+      {
+        in: header,
+        name: If-Match,
+        required: true,
+        schema: { type: string },
+        example: '"3"',
+      }
+    IdempotencyKey:
+      {
+        in: header,
+        name: Idempotency-Key,
+        required: true,
+        schema: { type: string, minLength: 16, maxLength: 128 },
+      }
+  schemas:
+    DocumentUploadInput:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          owner_type,
+          owner_id,
+          purpose,
+          filename,
+          size_bytes,
+          mime_type,
+          checksum_sha256,
+        ]
+      properties:
+        owner_type:
+          { type: string, enum: [STUDENT, SUBMISSION, EDUCATION_EXPENSE] }
+        owner_id: { type: string, format: uuid }
+        purpose: { type: string, minLength: 2, maxLength: 40 }
+        filename: { type: string, minLength: 1, maxLength: 255 }
+        size_bytes: { type: integer, minimum: 1, maximum: 10485760 }
+        mime_type:
+          { type: string, enum: [application/pdf, image/jpeg, image/png] }
+        checksum_sha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+    SubmissionCreateInput:
+      type: object
+      additionalProperties: false
+      required: [student_id, period_id, type]
+      properties:
+        student_id: { type: string, format: uuid }
+        period_id: { type: string, format: uuid }
+        type: { type: string, minLength: 2, maxLength: 30 }
+    SubmissionDraftInput:
+      type: object
+      additionalProperties: false
+      required: [payload]
+      properties: { payload: { type: object, additionalProperties: true } }
+    SubmissionReviewInput:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [APPROVE, RETURN, REJECT] }
+        reason_code: { type: string, minLength: 2, maxLength: 50 }
+        note: { type: string, maxLength: 2000 }
+    ConfigurationInput:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [code, name]
+          properties:
+            code: { type: string, minLength: 2, maxLength: 30 }
+            name: { type: string, minLength: 2, maxLength: 150 }
+            active: { type: boolean }
+        - type: object
+          additionalProperties: false
+          required: [code, name, workflow_type]
+          properties:
+            code: { type: string, minLength: 2, maxLength: 30 }
+            name: { type: string, minLength: 2, maxLength: 150 }
+            workflow_type: { type: string, enum: [ONE_LEVEL, TWO_LEVEL] }
+            self_service_mode:
+              {
+                type: [string, "null"],
+                enum: [SCHOOL_MANAGED, STUDENT_MANAGED, HYBRID, null],
+              }
+            self_service_min_grade: { type: integer, minimum: 1, maximum: 12 }
+            active: { type: boolean }
+        - type: object
+          additionalProperties: false
+          required: [program_id, code, due_at, timezone, workflow_type]
+          properties:
+            program_id: { type: string, format: uuid }
+            code: { type: string, minLength: 2, maxLength: 30 }
+            opens_at: { type: [string, "null"], format: date-time }
+            due_at: { type: string, format: date-time }
+            timezone: { type: string, enum: [Asia/Ho_Chi_Minh] }
+            workflow_type: { type: string, enum: [ONE_LEVEL, TWO_LEVEL] }
+        - type: object
+          additionalProperties: false
+          required: [calendar_date, day_type, name]
+          properties:
+            calendar_date: { type: string, format: date }
+            day_type: { type: string, enum: [HOLIDAY, WORKING_DAY] }
+            name: { type: string, minLength: 2, maxLength: 150 }
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status, correlation_id]
+      properties:
+        status: { type: string, enum: [ok] }
+        correlation_id: { type: string, format: uuid }
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, code]
+      properties:
+        field: { type: string }
+        code: { type: string }
+        params: { type: object, additionalProperties: true }
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message_key, field_errors, correlation_id]
+      properties:
+        code: { type: string, example: VERSION_CONFLICT }
+        message_key: { type: string, example: errors.versionConflict }
+        field_errors:
+          { type: array, items: { $ref: "#/components/schemas/FieldError" } }
+        correlation_id: { type: string, format: uuid }
+    StudentInput:
+      type: object
+      additionalProperties: false
+      required:
+        [student_code, full_name, date_of_birth, program_id, current_school_id]
+      properties:
+        student_code: { type: string, minLength: 3, maxLength: 30 }
+        full_name: { type: string, minLength: 1, maxLength: 150 }
+        date_of_birth: { type: string, format: date }
+        program_id: { type: string, format: uuid }
+        current_school_id: { type: string, format: uuid }
+        grade_level_current: { type: integer, minimum: 1, maximum: 12 }
+        duplicate_override_reason:
+          { type: string, minLength: 10, maxLength: 500 }
+    StudentPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        full_name: { type: string, minLength: 1, maxLength: 150 }
+        date_of_birth: { type: string, format: date }
+        grade_level_current: { type: integer, minimum: 1, maximum: 12 }
+    GuardianInput:
+      type: object
+      additionalProperties: false
+      required: [full_name, relationship]
+      anyOf: [{ required: [phone] }, { required: [email] }]
+      properties:
+        full_name: { type: string, minLength: 2, maxLength: 150 }
+        relationship: { type: string, enum: [MOTHER, FATHER, GUARDIAN, OTHER] }
+        is_primary: { type: boolean, default: false }
+        phone: { type: string, minLength: 8, maxLength: 20 }
+        email: { type: string, format: email }
+    StudentSchoolTransferInput:
+      type: object
+      additionalProperties: false
+      required: [target_school_id, effective_from, reason]
+      properties:
+        target_school_id: { type: string, format: uuid }
+        effective_from: { type: string, format: date }
+        reason: { type: string, minLength: 10, maxLength: 500 }
+    EducationExpenseInput:
+      type: object
+      additionalProperties: false
+      properties:
+        vnd_per_term: { type: [string, "null"], pattern: '^\d+(\.\d{1,2})?$' }
+        vnd_per_year: { type: [string, "null"], pattern: '^\d+(\.\d{1,2})?$' }
+        usd_amount: { type: [string, "null"], pattern: '^\d+(\.\d{1,2})?$' }
+        liability: { type: [string, "null"], pattern: '^\d+(\.\d{1,2})?$' }
+        tutoring_money: { type: [string, "null"], pattern: '^\d+(\.\d{1,2})?$' }
+        notes: { type: [string, "null"], maxLength: 4000 }
+    StudentSupportInput:
+      type: object
+      additionalProperties: false
+      required: [program_code, received, currency, status]
+      properties:
+        program_code: { type: string, minLength: 2, maxLength: 30 }
+        received: { type: boolean }
+        received_date: { type: [string, "null"], format: date }
+        support_value: { type: [string, "null"], pattern: '^\d+(\.\d{1,2})?$' }
+        currency: { type: string, enum: [VND, USD] }
+        status: { type: string, enum: [PLANNED, ACTIVE, COMPLETED, CANCELLED] }
+        notes: { type: [string, "null"], maxLength: 4000 }
+    ManualTransferInput:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          student_id,
+          period_id,
+          transfer_type,
+          amount,
+          currency,
+          transferred_at,
+          reference,
+        ]
+      properties:
+        student_id: { type: string, format: uuid }
+        period_id: { type: string, format: uuid }
+        transfer_type: { type: string }
+        amount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$' }
+        currency: { type: string, enum: [VND, USD] }
+        transferred_at: { type: string, format: date-time }
+        reference: { type: string }
+    TransferConfirmationInput:
+      type: object
+      additionalProperties: false
+      required: [result]
+      properties:
+        result: { type: string, enum: [RECEIVED, NOT_RECEIVED] }
+        note: { type: string, maxLength: 1000 }
+    TransferCorrectionInput:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          transfer_type,
+          amount,
+          currency,
+          transferred_at,
+          reference,
+          reason_code,
+          reason,
+        ]
+      properties:
+        transfer_type: { type: string, minLength: 1, maxLength: 30 }
+        amount: { type: string, pattern: '^\d+(\.\d{1,2})?$' }
+        currency: { type: string, enum: [VND, USD] }
+        transferred_at: { type: string, format: date-time }
+        reference: { type: string, minLength: 1, maxLength: 100 }
+        reason_code: { type: string, minLength: 2, maxLength: 50 }
+        reason: { type: string, minLength: 10, maxLength: 1000 }
+    BankAccountInput:
+      type: object
+      additionalProperties: false
+      required: [account_name, account_number, bank_code]
+      properties:
+        account_name: { type: string, minLength: 2, maxLength: 150 }
+        account_number: { type: string, pattern: "^[0-9 -]{6,40}$" }
+        bank_code: { type: string, pattern: "^[A-Z0-9_-]{2,20}$" }
+    BankReviewInput:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [VALIDATED, REJECTED] }
+        reason: { type: string, minLength: 10, maxLength: 500 }
+  responses:
+    ServiceUnavailable:
+      description: Dependency unavailable
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Unauthorized:
+      {
+        description: Authentication or MFA required,
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/ErrorResponse" } },
+          },
+      }
+    NotFound:
+      {
+        description: Missing or concealed by scope,
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/ErrorResponse" } },
+          },
+      }
+    Conflict:
+      {
+        description: "Duplicate, state or version conflict",
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/ErrorResponse" } },
+          },
+      }
+    ValidationFailed:
+      {
+        description: Business validation failed,
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/ErrorResponse" } },
+          },
+      }
+    PreconditionRequired:
+      {
+        description: If-Match/version is required,
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/ErrorResponse" } },
+          },
+      }
+    BadRequest:
+      {
+        description: Malformed request,
+        content:
+          {
+            application/json:
+              { schema: { $ref: "#/components/schemas/ErrorResponse" } },
+          },
+      }
