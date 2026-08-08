@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src test",
     "test": "vitest run",
-    "test:integration": "vitest run test/integration",
+    "test:integration": "vitest run test/integration --no-file-parallelism --maxWorkers=1",
     "test:security": "vitest run test/security",
     "db:migrate": "node dist/database/migrate.js"
   },

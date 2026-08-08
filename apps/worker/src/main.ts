@@ -3,6 +3,8 @@ import { Redis } from "ioredis";
 import { Pool } from "pg";
 import { loadConfig } from "@vnsf/config";
 import { scanDocument } from "./document-scanner.js";
+import { deliverEvent } from "./notifications.js";
+import { enqueueDueReminders, reconcileReminders } from "./reminders.js";
 
 type OutboxRow = {
   id: string;
@@ -26,7 +28,14 @@ const consumer = new Worker(
       if (typeof payload.document_id !== "string")
         throw new Error("DOCUMENT_ID_REQUIRED");
       await scanDocument(database, payload.document_id);
+      return;
     }
+    await deliverEvent(
+      database,
+      job.name,
+      job.data as Record<string, unknown>,
+      String(job.id),
+    );
   },
   { connection, concurrency: 2 },
 );
@@ -60,7 +69,13 @@ async function dispatchBatch(): Promise<void> {
 }
 
 async function run(): Promise<void> {
+  let nextReconciliation = 0;
   while (!stopping) {
+    if (Date.now() >= nextReconciliation) {
+      await reconcileReminders(database);
+      await enqueueDueReminders(database);
+      nextReconciliation = Date.now() + 60_000;
+    }
     await dispatchBatch();
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
