@@ -63,10 +63,6 @@ suite("banking persistence and disclosure controls", () => {
     );
   });
   afterAll(async () => {
-    await db.query(`DELETE FROM audit_events WHERE actor_id IN($1,$2)`, [
-      ids.user,
-      ids.manager,
-    ]);
     await db.query(`DELETE FROM student_bank_accounts WHERE student_id=$1`, [
       ids.student,
     ]);

@@ -1019,6 +1019,173 @@ paths:
       responses:
         "200": { description: Import application queued }
         "409": { $ref: "#/components/responses/Conflict" }
+  /audit-events:
+    get:
+      summary: Search append-only redacted audit evidence
+      operationId: searchAuditEvents
+      parameters:
+        - { name: actor_id, in: query, schema: { type: string, format: uuid } }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: resource_type, in: query, schema: { type: string } }
+        - {
+            name: result,
+            in: query,
+            schema: { type: string, enum: [SUCCESS, FAILURE] },
+          }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - {
+            name: cursor,
+            in: query,
+            schema: { type: string, format: date-time },
+          }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100 },
+          }
+      responses:
+        "200": { description: Cursor page of redacted audit evidence }
+        "403": { description: Audit permission required }
+  /retention/policies:
+    get:
+      summary: List versioned retention policies
+      operationId: listRetentionPolicies
+      responses:
+        {
+          "200": { description: Policy versions },
+          "403": { description: Administration permission required },
+        }
+    post:
+      summary: Create a new retention policy version
+      operationId: createRetentionPolicy
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        {
+          "200": { description: Policy version created },
+          "422": { $ref: "#/components/responses/ValidationFailed" },
+        }
+  /retention/dry-runs:
+    get:
+      summary: List non-destructive retention previews
+      operationId: listRetentionDryRuns
+      responses:
+        {
+          "200": { description: Preview evidence },
+          "403": { description: Administration permission required },
+        }
+    post:
+      summary: Count candidates while excluding active legal holds without changing data
+      operationId: createRetentionDryRun
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        {
+          "200": { description: Dry-run evidence created },
+          "404": { $ref: "#/components/responses/NotFound" },
+        }
+  /retention/dry-runs/{id}/approve:
+    post:
+      summary: Approve immutable dry-run evidence without enabling purge
+      operationId: approveRetentionDryRun
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+      responses:
+        {
+          "200": { description: Evidence approved },
+          "404": { $ref: "#/components/responses/NotFound" },
+        }
+  /legal-holds:
+    get:
+      summary: List legal holds
+      operationId: listLegalHolds
+      responses:
+        {
+          "200": { description: Legal holds },
+          "403": { description: Administration permission required },
+        }
+    post:
+      summary: Create an audited legal hold
+      operationId: createLegalHold
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        {
+          "200": { description: Hold created },
+          "422": { $ref: "#/components/responses/ValidationFailed" },
+        }
+  /legal-holds/{id}/release:
+    patch:
+      summary: Release a legal hold with a mandatory reason
+      operationId: releaseLegalHold
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+      responses:
+        {
+          "200": { description: Hold released },
+          "404": { $ref: "#/components/responses/NotFound" },
+        }
+  /consent-policies:
+    get:
+      summary: List published localized consent policies
+      operationId: listConsentPolicies
+      responses:
+        {
+          "200": { description: Published policy versions },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        }
+    post:
+      summary: Publish a hashed localized consent policy version
+      operationId: publishConsentPolicy
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        {
+          "200": { description: Policy version published },
+          "422": { $ref: "#/components/responses/ValidationFailed" },
+        }
+  /students/{studentId}/consents/{policyId}:
+    post:
+      summary: Record idempotent scoped consent acceptance with redacted evidence
+      operationId: acceptConsent
+      parameters:
+        - { $ref: "#/components/parameters/StudentId" }
+        - {
+            name: policyId,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        {
+          "200": { description: Consent accepted },
+          "404": { $ref: "#/components/responses/NotFound" },
+        }
+  /students/{studentId}/consents/{policyId}/withdraw:
+    patch:
+      summary: Withdraw an active owned consent acceptance
+      operationId: withdrawConsent
+      parameters:
+        - { $ref: "#/components/parameters/StudentId" }
+        - {
+            name: policyId,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        {
+          "200": { description: Consent withdrawn },
+          "404": { $ref: "#/components/responses/NotFound" },
+        }
+  /metrics:
+    get:
+      summary: Expose non-personal operational metrics in Prometheus text format
+      operationId: getMetrics
+      security: []
+      responses:
+        "200": { description: Prometheus metrics }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
 components:
   securitySchemes:
     sessionCookie:

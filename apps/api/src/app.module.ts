@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { HealthController } from "./platform/health.controller.js";
 import { StudentsController } from "./modules/students/students.controller.js";
 import { StudentsService } from "./modules/students/students.service.js";
@@ -28,6 +28,11 @@ import { NotificationsController } from "./modules/notifications/notifications.c
 import { NotificationsService } from "./modules/notifications/notifications.service.js";
 import { ReportingController } from "./modules/reporting/reporting.controller.js";
 import { ReportingService } from "./modules/reporting/reporting.service.js";
+import { GovernanceController } from "./modules/governance/governance.controller.js";
+import { GovernanceService } from "./modules/governance/governance.service.js";
+import { MetricsController } from "./platform/metrics.controller.js";
+import { MetricsService } from "./platform/metrics.service.js";
+import { ObservabilityInterceptor } from "./platform/observability.interceptor.js";
 
 @Module({
   controllers: [
@@ -43,6 +48,8 @@ import { ReportingService } from "./modules/reporting/reporting.service.js";
     ObligationsController,
     NotificationsController,
     ReportingController,
+    GovernanceController,
+    MetricsController,
   ],
   providers: [
     DatabaseService,
@@ -60,7 +67,10 @@ import { ReportingService } from "./modules/reporting/reporting.service.js";
     ObligationsService,
     NotificationsService,
     ReportingService,
+    GovernanceService,
+    MetricsService,
     { provide: APP_GUARD, useClass: SessionGuard },
+    { provide: APP_INTERCEPTOR, useClass: ObservabilityInterceptor },
   ],
 })
 export class AppModule {}

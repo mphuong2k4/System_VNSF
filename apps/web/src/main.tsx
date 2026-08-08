@@ -28,6 +28,7 @@ import { AssistancePage } from "./features/assistance/AssistancePage";
 import { ObligationsPage } from "./features/obligations/ObligationsPage";
 import { NotificationsPage } from "./features/notifications/NotificationsPage";
 import { ReportingPage } from "./features/reporting/ReportingPage";
+import { GovernancePage } from "./features/governance/GovernancePage";
 const query = new QueryClient();
 function Shell() {
   const { t, i18n } = useTranslation();
@@ -64,6 +65,7 @@ function Shell() {
           <Link to="/obligations">{t("obligations.title")}</Link>
           <Link to="/notifications">{t("notifications.title")}</Link>
           <Link to="/reporting">{t("reporting.title")}</Link>
+          <Link to="/governance">{t("governance.title")}</Link>
         </Box>
         <Routes>
           <Route path="/sessions" element={<SessionsPage />} />
@@ -77,6 +79,7 @@ function Shell() {
           <Route path="/obligations" element={<ObligationsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/reporting" element={<ReportingPage />} />
+          <Route path="/governance" element={<GovernancePage />} />
           <Route path="/" element={<ReportingPage />} />
           <Route
             path="*"
