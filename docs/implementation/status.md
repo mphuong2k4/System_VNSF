@@ -1,6 +1,6 @@
 # Implementation status
 
-Last verified phase: Notifications and Reminders, 2026-08-08.
+Last verified phase: Dashboards, Scoped Reports, and Asynchronous Import/Export, 2026-08-08.
 
 Implemented and build-verified: typed environment configuration; NestJS API boundary; PostgreSQL repository/transaction foundation; opaque sessions; activation and password reset tokens; TOTP enrollment/verification/recovery; re-authentication; session list/revoke; global Origin/CSRF/session/MFA guard; React login, MFA, activation, reset and session pages; vi-VN/en-US catalogs; OpenAPI validation; outbox dispatcher; Student, Submission and Manual Transfer foundational use cases.
 
@@ -30,4 +30,6 @@ Local Compose runtime hardened: Nginx serves the SPA on 8080 with history fallba
 
 Notifications and Reminders phase implemented: PostgreSQL-backed reconciliation creates deduplicated T-14/T-7/T-2/T+1/T+7 schedules from each submission effective deadline and active student account. Pre-deadline reminders move to the next configured working day while overdue milestones remain calendar-day based. Submission stops/corrections and approved extensions cancel stale scheduled reminders; the next reconciliation creates schedules from the new deadline. Worker outbox jobs create idempotent in-app and email deliveries, snapshot vi-VN/en-US locale, use versioned templates, send through the configured SMTP relay and persist retry/backoff evidence without making Redis authoritative. Password-reset events now produce actual expiring-link email delivery. Authenticated users have a private inbox, unread count and owned read/read-all mutations in the localized UI. Migration 013 adds reminder schedules, templates, delivery lifecycle/retry fields and notification dedupe keys.
 
-Next implementation phase: Dashboards, Scoped Reports, and Asynchronous Import/Export.
+Dashboards, Scoped Reports, and Asynchronous Import/Export phase implemented: dashboard counters constrain students, submissions and transfers to program-wide, effective school or linked-student scope. Authorized managers receive per-school workflow and currency totals without join multiplication. Export jobs snapshot school scope, run through the transactional outbox, generate UTF-8 CSV with spreadsheet-formula neutralization, store results in the private object bucket and expose only five-minute signed URLs to the requesting owner. Student imports accept at most 1,000 validated rows, enforce active program/school references and school scope, detect duplicate codes, require a separate idempotent confirmation, apply students plus school history transactionally, and remove source rows after completion. Migration 014 adds the constrained job lifecycle, owner/idempotency indexes and immutable terminal-state protection. The localized dashboard/reporting UI covers metrics, reports, exports, import validation/confirmation and job results.
+
+Next implementation phase: Audit Search, Retention/Consent Administration, and Operational Observability.

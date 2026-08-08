@@ -26,6 +26,8 @@ import { ObligationsController } from "./modules/obligations/obligations.control
 import { ObligationsService } from "./modules/obligations/obligations.service.js";
 import { NotificationsController } from "./modules/notifications/notifications.controller.js";
 import { NotificationsService } from "./modules/notifications/notifications.service.js";
+import { ReportingController } from "./modules/reporting/reporting.controller.js";
+import { ReportingService } from "./modules/reporting/reporting.service.js";
 
 @Module({
   controllers: [
@@ -40,6 +42,7 @@ import { NotificationsService } from "./modules/notifications/notifications.serv
     AssistanceController,
     ObligationsController,
     NotificationsController,
+    ReportingController,
   ],
   providers: [
     DatabaseService,
@@ -56,6 +59,7 @@ import { NotificationsService } from "./modules/notifications/notifications.serv
     AssistanceService,
     ObligationsService,
     NotificationsService,
+    ReportingService,
     { provide: APP_GUARD, useClass: SessionGuard },
   ],
 })

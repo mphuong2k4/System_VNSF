@@ -5,6 +5,7 @@ import { loadConfig } from "@vnsf/config";
 import { scanDocument } from "./document-scanner.js";
 import { deliverEvent } from "./notifications.js";
 import { enqueueDueReminders, reconcileReminders } from "./reminders.js";
+import { processDataJob } from "./data-jobs.js";
 
 type OutboxRow = {
   id: string;
@@ -28,6 +29,13 @@ const consumer = new Worker(
       if (typeof payload.document_id !== "string")
         throw new Error("DOCUMENT_ID_REQUIRED");
       await scanDocument(database, payload.document_id);
+      return;
+    }
+    if (job.name.startsWith("data.")) {
+      const payload = job.data as { job_id?: unknown };
+      if (typeof payload.job_id !== "string")
+        throw new Error("DATA_JOB_ID_REQUIRED");
+      await processDataJob(database, job.name, payload.job_id);
       return;
     }
     await deliverEvent(
