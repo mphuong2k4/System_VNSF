@@ -25,6 +25,7 @@ import { DocumentsPage } from "./features/documents/DocumentsPage";
 import { BankingPage } from "./features/banking/BankingPage";
 import { TransfersPage } from "./features/transfers/TransfersPage";
 import { AssistancePage } from "./features/assistance/AssistancePage";
+import { ObligationsPage } from "./features/obligations/ObligationsPage";
 const query = new QueryClient();
 function Shell() {
   const { t, i18n } = useTranslation();
@@ -58,6 +59,7 @@ function Shell() {
           <Link to="/documents">{t("documents.title")}</Link>
           <Link to="/banking">{t("banking.title")}</Link>
           <Link to="/assistance">{t("assistance.title")}</Link>
+          <Link to="/obligations">{t("obligations.title")}</Link>
         </Box>
         <Routes>
           <Route path="/sessions" element={<SessionsPage />} />
@@ -68,6 +70,7 @@ function Shell() {
           <Route path="/banking" element={<BankingPage />} />
           <Route path="/transfers" element={<TransfersPage />} />
           <Route path="/assistance" element={<AssistancePage />} />
+          <Route path="/obligations" element={<ObligationsPage />} />
           <Route
             path="*"
             element={

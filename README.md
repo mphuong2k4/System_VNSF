@@ -9,6 +9,8 @@ Cloud-neutral modular monolith for the VNSF scholarship-management MVP. Business
 
 Copy `.env.example` to `.env`, replace development secrets, then run `docker compose up -d postgres redis minio mailpit clamav`, `pnpm install`, `pnpm db:migrate`, and `pnpm dev`.
 
+For the complete containerized stack, run `docker compose up -d --build` and open `http://localhost:5174`. The direct Vite development server remains at `http://localhost:5173`.
+
 Repository layout: `apps/api` is the NestJS 11 HTTP process, `apps/worker` owns BullMQ consumers, `apps/web` is React 19/Vite, and shared configuration/contracts live under `packages`. PostgreSQL is the source of truth; Redis is never authoritative. All object data is private and follows quarantine → scan → promote.
 
 Development verification: `pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build`. Integration and E2E checks require `docker compose -f docker-compose.test.yml up -d`, then `pnpm test:integration` and `pnpm test:e2e`.

@@ -10,7 +10,6 @@ COPY --from=build --chown=node:node /app /app
 CMD ["node","apps/api/dist/main.js"]
 FROM api AS worker
 CMD ["node","apps/worker/dist/main.js"]
-FROM nginx:1.27-alpine AS web
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS web
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
-USER nginx
-
+COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf

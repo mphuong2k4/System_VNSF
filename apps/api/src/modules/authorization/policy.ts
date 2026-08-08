@@ -36,6 +36,11 @@ const grants: Record<Role, ReadonlySet<string>> = {
     "expense.review",
     "support.read",
     "support.write",
+    "extension.request",
+    "extension.decide",
+    "thankyou.submit",
+    "thankyou.review.school",
+    "thankyou.review.final",
   ]),
   PROGRAM_MANAGER: new Set([
     "student.read",
@@ -52,6 +57,11 @@ const grants: Record<Role, ReadonlySet<string>> = {
     "expense.review",
     "support.read",
     "support.write",
+    "extension.request",
+    "extension.decide",
+    "thankyou.submit",
+    "thankyou.review.school",
+    "thankyou.review.final",
   ]),
   SCHOOL_MANAGER: new Set([
     "student.read",
@@ -64,6 +74,9 @@ const grants: Record<Role, ReadonlySet<string>> = {
     "expense.write",
     "support.read",
     "support.write",
+    "extension.request",
+    "thankyou.submit",
+    "thankyou.review.school",
   ]),
   STUDENT: new Set([
     "student.self",
@@ -75,6 +88,8 @@ const grants: Record<Role, ReadonlySet<string>> = {
     "support.read",
     "support.write",
     "bank.self",
+    "extension.request",
+    "thankyou.submit",
   ]),
 };
 export function can(actor: Actor, action: string, resource: Resource): boolean {

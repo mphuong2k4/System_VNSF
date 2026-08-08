@@ -110,7 +110,8 @@ export class AcademicsService {
     try {
       return (
         await this.db.query(
-          `INSERT INTO academic_submissions(student_id,period_id,type,status,created_by) VALUES($1,$2,$3,'DRAFT',$4)
+          `INSERT INTO academic_submissions(student_id,period_id,type,status,created_by,effective_due_at)
+           SELECT $1,$2,$3,'DRAFT',$4,due_at FROM academic_periods WHERE id=$2
          RETURNING id,student_id,period_id,type,status,current_version_no,version`,
           [value.student_id, value.period_id, value.type, auth.userId],
         )

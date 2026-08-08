@@ -11,7 +11,12 @@ import { ObjectStorageService } from "./object-storage.service.js";
 const allowedMime = new Set(["application/pdf", "image/jpeg", "image/png"]);
 const initSchema = z
   .object({
-    owner_type: z.enum(["STUDENT", "SUBMISSION", "EDUCATION_EXPENSE"]),
+    owner_type: z.enum([
+      "STUDENT",
+      "SUBMISSION",
+      "EDUCATION_EXPENSE",
+      "THANK_YOU_LETTER",
+    ]),
     owner_id: z.string().uuid(),
     purpose: z.string().min(2).max(40),
     filename: z.string().min(1).max(255),
@@ -39,7 +44,7 @@ export class DocumentsService {
   ) {}
   private async owner(
     auth: AuthContext,
-    type: "STUDENT" | "SUBMISSION" | "EDUCATION_EXPENSE",
+    type: "STUDENT" | "SUBMISSION" | "EDUCATION_EXPENSE" | "THANK_YOU_LETTER",
     id: string,
     write: boolean,
   ) {
@@ -53,14 +58,16 @@ export class DocumentsService {
         ? `SELECT id student_id,current_school_id school_id,grade_level_current,NULL::text expense_status FROM students WHERE id=$1`
         : type === "SUBMISSION"
           ? `SELECT a.student_id,s.current_school_id school_id,s.grade_level_current,NULL::text expense_status FROM academic_submissions a JOIN students s ON s.id=a.student_id WHERE a.id=$1`
-          : `SELECT e.student_id,e.school_id,s.grade_level_current,e.status expense_status FROM education_expenses e JOIN students s ON s.id=e.student_id WHERE e.id=$1`,
+          : type === "EDUCATION_EXPENSE"
+            ? `SELECT e.student_id,e.school_id,s.grade_level_current,e.status expense_status FROM education_expenses e JOIN students s ON s.id=e.student_id WHERE e.id=$1`
+            : `SELECT l.student_id,s.current_school_id school_id,s.grade_level_current,l.status expense_status FROM thank_you_letters l JOIN students s ON s.id=l.student_id WHERE l.id=$1`,
       [id],
     );
     const resource = result.rows[0];
     if (!resource) throw new DomainError("RESOURCE_NOT_FOUND", 404);
     const actor = toActor(auth);
     const allowed = write
-      ? type === "SUBMISSION"
+      ? type === "SUBMISSION" || type === "THANK_YOU_LETTER"
         ? can(actor, "submission.submit", {
             studentId: resource.student_id,
             schoolId: resource.school_id,
@@ -119,7 +126,11 @@ export class DocumentsService {
   async complete(auth: AuthContext, id: string) {
     const document = await this.document(id);
     const link = await this.db.query<{
-      owner_type: "STUDENT" | "SUBMISSION" | "EDUCATION_EXPENSE";
+      owner_type:
+        | "STUDENT"
+        | "SUBMISSION"
+        | "EDUCATION_EXPENSE"
+        | "THANK_YOU_LETTER";
       owner_id: string;
     }>(
       `SELECT owner_type,owner_id FROM document_links WHERE document_id=$1 LIMIT 1`,
@@ -169,7 +180,11 @@ export class DocumentsService {
   async download(auth: AuthContext, id: string) {
     const document = await this.document(id);
     const link = await this.db.query<{
-      owner_type: "STUDENT" | "SUBMISSION" | "EDUCATION_EXPENSE";
+      owner_type:
+        | "STUDENT"
+        | "SUBMISSION"
+        | "EDUCATION_EXPENSE"
+        | "THANK_YOU_LETTER";
       owner_id: string;
     }>(
       `SELECT owner_type,owner_id FROM document_links WHERE document_id=$1 LIMIT 1`,

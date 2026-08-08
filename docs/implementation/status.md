@@ -1,6 +1,6 @@
 # Implementation status
 
-Last verified phase: Education Expenses and Support Programs, 2026-08-02.
+Last verified phase: Extensions and Thank-you Letters, 2026-08-08.
 
 Implemented and build-verified: typed environment configuration; NestJS API boundary; PostgreSQL repository/transaction foundation; opaque sessions; activation and password reset tokens; TOTP enrollment/verification/recovery; re-authentication; session list/revoke; global Origin/CSRF/session/MFA guard; React login, MFA, activation, reset and session pages; vi-VN/en-US catalogs; OpenAPI validation; outbox dispatcher; Student, Submission and Manual Transfer foundational use cases.
 
@@ -24,4 +24,8 @@ Education Expenses and Support Programs phase implemented: yearly VND/USD expens
 
 Local infrastructure verification: Docker Desktop 4.84.0 is running with Redis 7, MinIO, Mailpit and healthy ClamAV containers. A direct PostgreSQL 16.14 service is running on port 55432; database `vnsf_test` successfully applied migrations 001-011. Clean and EICAR-infected document flows passed real PostgreSQL/MinIO/ClamAV integration tests. Expense/support workflows passed a dedicated PostgreSQL integration database. Runtime package exports were corrected so compiled API/migration code loads compiled config rather than TypeScript source.
 
-Next implementation phase: Extensions and Thank-you Letters.
+Extensions and Thank-you Letters phase implemented: scoped students and school managers can request a later effective academic-submission deadline while a partial unique constraint prevents simultaneous open requests. Program managers approve or reject with optimistic locking and mandatory reasons; approval updates the snapshotted effective deadline and publishes an outbox event for reminder cancellation/rescheduling. Thank-you letters are unique by student and period, support editable drafts, immutable submitted versions, CLEAN document evidence, one/two-level review, reviewer separation and final approval locking. Migration 012 adds effective deadlines, extension evidence, thank-you records/version/review tables and append-only triggers. The localized web UI and OpenAPI contract cover both workflows.
+
+Local Compose runtime hardened: Nginx serves the SPA on 8080 with history fallback and `/api` reverse proxy; API/worker use internal service DNS; MinIO initialization creates a non-public private bucket before application startup.
+
+Next implementation phase: Notifications and Reminders.

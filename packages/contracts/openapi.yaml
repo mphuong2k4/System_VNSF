@@ -772,6 +772,129 @@ paths:
         "200": { description: Five-minute private download URL }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+  /extension-requests:
+    get:
+      summary: List extension requests in the caller scope
+      operationId: listExtensionRequests
+      responses:
+        "200": { description: Scoped extension requests }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /obligations/{id}/extension-requests:
+    post:
+      summary: Request a later effective deadline
+      operationId: requestExtension
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/ResourceId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason, proposed_due_at]
+              properties:
+                reason: { type: string, minLength: 10, maxLength: 2000 }
+                proposed_due_at: { type: string, format: date-time }
+      responses:
+        "200": { description: Extension request created }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /extension-requests/{id}/decision:
+    post:
+      summary: Approve or reject an extension request
+      operationId: decideExtension
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ResourceId" }
+        - { $ref: "#/components/parameters/IfMatch" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision, reason]
+              properties:
+                decision: { type: string, enum: [APPROVE, REJECT] }
+                reason: { type: string, minLength: 5, maxLength: 2000 }
+      responses:
+        "200": { description: Extension request decided }
+        "412": { $ref: "#/components/responses/Conflict" }
+  /thank-you-letters:
+    get:
+      summary: List thank-you letters in the caller scope
+      operationId: listThankYouLetters
+      parameters:
+        - { name: queue, in: query, schema: { type: boolean } }
+      responses:
+        "200": { description: Scoped thank-you letters }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      summary: Create a thank-you letter draft
+      operationId: createThankYouLetter
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [student_id, period_id, content]
+              properties:
+                student_id: { type: string, format: uuid }
+                period_id: { type: string, format: uuid }
+                content: { type: string, minLength: 20, maxLength: 20000 }
+      responses:
+        "200": { description: Draft created }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /thank-you-letters/{id}/draft:
+    patch:
+      summary: Save a thank-you letter draft
+      operationId: saveThankYouLetterDraft
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ResourceId" }
+        - { $ref: "#/components/parameters/IfMatch" }
+      responses:
+        "200": { description: Draft saved }
+        "412": { $ref: "#/components/responses/Conflict" }
+  /thank-you-letters/{id}/submit:
+    post:
+      summary: Submit and snapshot a thank-you letter
+      operationId: submitThankYouLetter
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ResourceId" }
+        - { $ref: "#/components/parameters/IfMatch" }
+      responses:
+        "200": { description: Letter submitted for school review }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /thank-you-letters/{id}/review:
+    post:
+      summary: Review a thank-you letter
+      operationId: reviewThankYouLetter
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ResourceId" }
+        - { $ref: "#/components/parameters/IfMatch" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [APPROVE, RETURN, REJECT] }
+                reason_code: { type: string, minLength: 2, maxLength: 50 }
+                note: { type: string, maxLength: 2000 }
+      responses:
+        "200": { description: Review recorded }
+        "409": { $ref: "#/components/responses/Conflict" }
 components:
   securitySchemes:
     sessionCookie:

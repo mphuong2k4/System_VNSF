@@ -22,6 +22,8 @@ import { BankingController } from "./modules/banking/banking.controller.js";
 import { BankingService } from "./modules/banking/banking.service.js";
 import { AssistanceController } from "./modules/assistance/assistance.controller.js";
 import { AssistanceService } from "./modules/assistance/assistance.service.js";
+import { ObligationsController } from "./modules/obligations/obligations.controller.js";
+import { ObligationsService } from "./modules/obligations/obligations.service.js";
 
 @Module({
   controllers: [
@@ -34,6 +36,7 @@ import { AssistanceService } from "./modules/assistance/assistance.service.js";
     DocumentsController,
     BankingController,
     AssistanceController,
+    ObligationsController,
   ],
   providers: [
     DatabaseService,
@@ -48,6 +51,7 @@ import { AssistanceService } from "./modules/assistance/assistance.service.js";
     ObjectStorageService,
     BankingService,
     AssistanceService,
+    ObligationsService,
     { provide: APP_GUARD, useClass: SessionGuard },
   ],
 })

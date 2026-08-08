@@ -31,6 +31,15 @@ services:
       { MINIO_ROOT_USER: vnsf-local, MINIO_ROOT_PASSWORD: replace-local-secret }
     ports: ["9000:9000", "9001:9001"]
     volumes: [minio_data:/data]
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on: [minio]
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        "until mc alias set local http://minio:9000 vnsf-local replace-local-secret; do sleep 2; done; mc mb --ignore-existing local/vnsf-private; mc anonymous set none local/vnsf-private",
+      ]
   mailpit:
     image: axllent/mailpit:latest
     ports: ["1025:1025", "8025:8025"]
@@ -41,22 +50,39 @@ services:
   api:
     build: { context: ., dockerfile: infra/docker/Dockerfile, target: api }
     env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql://vnsf:vnsf_dev_only@postgres:5432/vnsf
+      REDIS_URL: redis://redis:6379
+      OBJECT_STORAGE_ENDPOINT: http://minio:9000
+      SMTP_URL: smtp://mailpit:1025
+      CLAMAV_HOST: clamav
+      APP_BASE_URL: http://localhost:5174
     ports: ["3000:3000"]
     depends_on:
       {
         postgres: { condition: service_healthy },
         redis: { condition: service_started },
+        minio-init: { condition: service_completed_successfully },
       }
   worker:
     build: { context: ., dockerfile: infra/docker/Dockerfile, target: worker }
     env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql://vnsf:vnsf_dev_only@postgres:5432/vnsf
+      REDIS_URL: redis://redis:6379
+      OBJECT_STORAGE_ENDPOINT: http://minio:9000
+      SMTP_URL: smtp://mailpit:1025
+      CLAMAV_HOST: clamav
+      APP_BASE_URL: http://localhost:5174
+    restart: on-failure:5
     depends_on:
       {
         postgres: { condition: service_healthy },
         redis: { condition: service_started },
+        minio-init: { condition: service_completed_successfully },
       }
   web:
     build: { context: ., dockerfile: infra/docker/Dockerfile, target: web }
-    ports: ["5173:8080"]
+    ports: ["5174:8080"]
     depends_on: [api]
 volumes: { postgres_data: {}, redis_data: {}, minio_data: {}, clamav_data: {} }
