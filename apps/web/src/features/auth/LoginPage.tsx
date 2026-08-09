@@ -99,25 +99,38 @@ export function LoginPage() {
           flexDirection: "column",
           justifyContent: "flex-start",
           position: "relative",
-          p: { md: 5, lg: "5.5vh 7vw" },
+          p: { md: 5, lg: "5.5vh 5vw" },
         }}
       >
         <Box
           role="img"
           aria-label="Vietnam Scholarship Foundation"
           sx={{
-            width: { md: 190, lg: 205 },
-            height: { md: 76, lg: 82 },
-            backgroundImage: "url('/assets/logo-vnsf.png')",
-            backgroundRepeat: "no-repeat",
-            backgroundSize: "82% auto",
-            backgroundPosition: "center 43%",
+            position: "relative",
+            overflow: "hidden",
+            width: { md: 185, lg: 195 },
+            height: { md: 80, lg: 84 },
           }}
-        />
+        >
+          <Box
+            component="img"
+            src="/assets/logo-vnsf.png"
+            alt=""
+            sx={{
+              position: "absolute",
+              width: { md: 190, lg: 200 },
+              maxWidth: "none",
+              height: "auto",
+              top: { md: -51, lg: -54 },
+              left: { md: -2, lg: -2 },
+              imageRendering: "auto",
+            }}
+          />
+        </Box>
         <Box
           sx={{
             maxWidth: 700,
-            mt: { md: "3.5vh", lg: "4vh" },
+            mt: { md: "5vh", lg: "6vh" },
           }}
         >
           <Box
@@ -146,8 +159,9 @@ export function LoginPage() {
               mt: 1.5,
               mb: 1.75,
               color: "#17366d",
-              fontSize: { md: 36, lg: 43 },
-              lineHeight: 1.1,
+              fontSize: { md: 40, lg: 46 },
+              fontWeight: 750,
+              lineHeight: 1.08,
             }}
           >
             Nền tảng quản lý học bổng
@@ -160,7 +174,12 @@ export function LoginPage() {
           </Typography>
           <Typography
             color="text.secondary"
-            sx={{ maxWidth: 540, fontSize: 16, lineHeight: 1.7 }}
+            sx={{
+              maxWidth: 560,
+              fontSize: { md: 16, lg: 18 },
+              fontWeight: 550,
+              lineHeight: 1.65,
+            }}
           >
             Quản lý học sinh, hồ sơ học tập, hỗ trợ tài chính và báo cáo trên
             một nền tảng thống nhất.
@@ -228,11 +247,17 @@ export function LoginPage() {
             noValidate
           >
             <Box sx={{ textAlign: "center" }}>
-              <Typography variant="h3" sx={{ fontSize: { xs: 28, sm: 34 } }}>
+              <Typography
+                variant="h3"
+                sx={{ fontSize: { xs: 30, sm: 36 }, fontWeight: 750 }}
+              >
                 Đăng nhập hệ thống
               </Typography>
-              <Typography color="text.secondary" sx={{ mt: 1 }}>
-                Vui lòng đăng nhập để tiếp tục quản lý chương trình học bổng.
+              <Typography
+                color="text.secondary"
+                sx={{ mt: 1, fontSize: { xs: 14, sm: 16 }, fontWeight: 500 }}
+              >
+                Vui lòng đăng nhập để tiếp tục.
               </Typography>
             </Box>
             {serverError && (
