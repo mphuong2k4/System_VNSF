@@ -15,7 +15,6 @@ import {
   Typography,
 } from "@vnsf/ui";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router";
 import { api, HttpError } from "../../lib/api";
 
 const schema = z.object({
@@ -83,10 +82,13 @@ export function LoginPage() {
   return (
     <Box
       sx={{
-        minHeight: "100vh",
+        position: "fixed",
+        inset: 0,
+        width: "100vw",
+        height: "100dvh",
         display: "grid",
         gridTemplateColumns: { xs: "1fr", md: "1.1fr minmax(440px,.9fr)" },
-        overflow: "hidden",
+        overflow: "auto",
         backgroundImage: "url('/assets/vnsf-login-background.png')",
         backgroundSize: "cover",
         backgroundPosition: "center",
@@ -130,7 +132,7 @@ export function LoginPage() {
         <Box
           sx={{
             maxWidth: 700,
-            mt: { md: "5vh", lg: "6vh" },
+            mt: { md: "6vh", lg: "7vh" },
           }}
         >
           <Box
@@ -361,16 +363,6 @@ export function LoginPage() {
               >
                 <Icon name="arrow" size={17} />
               </Box>
-            </Button>
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Box sx={{ height: "1px", bgcolor: "divider", flex: 1 }} />
-              <Typography variant="caption" color="text.secondary">
-                hoặc
-              </Typography>
-              <Box sx={{ height: "1px", bgcolor: "divider", flex: 1 }} />
-            </Stack>
-            <Button component={Link} to="/forgot-password" variant="text">
-              {t("auth.forgot")}
             </Button>
           </Stack>
         </Paper>
