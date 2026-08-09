@@ -106,19 +106,18 @@ export function LoginPage() {
           role="img"
           aria-label="Vietnam Scholarship Foundation"
           sx={{
-            width: { md: 205, lg: 230 },
-            height: { md: 62, lg: 70 },
+            width: { md: 190, lg: 205 },
+            height: { md: 76, lg: 82 },
             backgroundImage: "url('/assets/logo-vnsf.png')",
             backgroundRepeat: "no-repeat",
-            backgroundSize: "112% auto",
+            backgroundSize: "82% auto",
             backgroundPosition: "center 43%",
           }}
         />
         <Box
           sx={{
             maxWidth: 700,
-            mt: { md: "2.5vh", lg: "3vh" },
-            transform: { md: "translateY(-1vh)", lg: "translateY(-1.25vh)" },
+            mt: { md: "3.5vh", lg: "4vh" },
           }}
         >
           <Box
@@ -206,20 +205,6 @@ export function LoginPage() {
             ))}
           </Box>
         </Box>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            position: "fixed",
-            left: { md: 14, lg: 18 },
-            bottom: { md: 7, lg: 9 },
-            zIndex: 2,
-            fontSize: { md: 9, lg: 10 },
-            lineHeight: 1.2,
-          }}
-        >
-          © 2026 VNSF · Vietnam Scholarship Foundation
-        </Typography>
       </Box>
       <Box
         component="main"
@@ -242,19 +227,6 @@ export function LoginPage() {
             onSubmit={(event) => void submit(event)}
             noValidate
           >
-            <Box
-              role="img"
-              aria-label="Vietnam Scholarship Foundation"
-              sx={{
-                mx: "auto",
-                width: { xs: 130, sm: 150 },
-                height: { xs: 54, sm: 62 },
-                backgroundImage: "url('/assets/logo-vnsf.png')",
-                backgroundRepeat: "no-repeat",
-                backgroundSize: "112% auto",
-                backgroundPosition: "center 43%",
-              }}
-            />
             <Box sx={{ textAlign: "center" }}>
               <Typography variant="h3" sx={{ fontSize: { xs: 28, sm: 34 } }}>
                 Đăng nhập hệ thống
