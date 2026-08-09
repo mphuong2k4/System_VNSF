@@ -11,6 +11,8 @@ Copy `.env.example` to `.env`, replace development secrets, then run `docker com
 
 For the complete containerized stack, run `docker compose up -d --build` and open `http://localhost:5174`. The direct Vite development server remains at `http://localhost:5173`.
 
+Local Super Admin accounts are never shipped with a default password. For an explicitly disposable development database, set `APP_ENV=development`, `DEMO_ALLOW_ADMIN_SEED=true`, `DEMO_ADMIN_EMAIL`, `DEMO_ADMIN_PASSWORD` (at least 16 characters), and the normal database/encryption configuration, then run `pnpm --filter @vnsf/api seed:demo-admin`. The guarded command resets that demo account's password, role, sessions and TOTP factor and prints an authenticator URI. Never enable or run this command against staging or production.
+
 Repository layout: `apps/api` is the NestJS 11 HTTP process, `apps/worker` owns BullMQ consumers, `apps/web` is React 19/Vite, and shared configuration/contracts live under `packages`. PostgreSQL is the source of truth; Redis is never authoritative. All object data is private and follows quarantine → scan → promote.
 
 Development verification: `pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
