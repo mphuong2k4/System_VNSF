@@ -323,7 +323,6 @@ export function LoginPage() {
                   border: "1px solid #cdece8",
                 }}
               >
-                <Icon name="lock" size={16} />
                 <Typography
                   variant="caption"
                   sx={{ fontWeight: 750, letterSpacing: ".06em" }}

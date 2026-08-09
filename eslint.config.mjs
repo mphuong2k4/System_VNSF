@@ -10,6 +10,7 @@ export default tseslint.config(
       ".tools/**",
       "apps/api/test/e2e-seed.mjs",
       "apps/api/test/demo-admin-seed.mjs",
+      "apps/api/test/demo-data-seed.mjs",
     ],
   },
   js.configs.recommended,

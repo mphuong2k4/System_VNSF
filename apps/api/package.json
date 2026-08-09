@@ -14,6 +14,7 @@
     "test:security": "vitest run test/security",
     "seed:e2e": "node test/e2e-seed.mjs",
     "seed:demo-admin": "node test/demo-admin-seed.mjs",
+    "seed:demo-data": "node test/demo-data-seed.mjs",
     "db:migrate": "node dist/database/migrate.js"
   },
   "dependencies": {
