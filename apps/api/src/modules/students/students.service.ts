@@ -52,6 +52,8 @@ type StudentRow = z.infer<typeof schema> & {
   id: string;
   version: number;
   status: string;
+  program_name?: string;
+  school_name?: string;
 };
 @Injectable()
 export class StudentsService {
@@ -74,9 +76,11 @@ export class StudentsService {
       (role) => role === "SUPER_ADMIN" || role === "PROGRAM_MANAGER",
     );
     const result = await this.db.query<StudentRow & { total_count: string }>(
-      `SELECT id,student_code,full_name,date_of_birth,program_id,current_school_id,grade_level_current,status,version,count(*) OVER() total_count
-       FROM students WHERE $1::boolean OR current_school_id=ANY($2::uuid[]) OR id=$3::uuid
-       ORDER BY student_code LIMIT $4 OFFSET $5`,
+      `SELECT s.id,s.student_code,s.full_name,s.date_of_birth,s.program_id,s.current_school_id,
+        s.grade_level_current,s.status,s.version,p.name program_name,sc.name school_name,count(*) OVER() total_count
+       FROM students s JOIN programs p ON p.id=s.program_id JOIN schools sc ON sc.id=s.current_school_id
+       WHERE $1::boolean OR s.current_school_id=ANY($2::uuid[]) OR s.id=$3::uuid
+       ORDER BY s.student_code LIMIT $4 OFFSET $5`,
       [unrestricted, actor.schoolIds, actor.studentId ?? null, safe, offset],
     );
     return {
@@ -179,7 +183,9 @@ export class StudentsService {
   }
   async get(auth: AuthContext, id: string) {
     const result = await this.db.query<StudentRow>(
-      `SELECT id,student_code,full_name,date_of_birth,program_id,current_school_id,grade_level_current,status,version FROM students WHERE id=$1`,
+      `SELECT s.id,s.student_code,s.full_name,s.date_of_birth,s.program_id,s.current_school_id,
+        s.grade_level_current,s.status,s.version,p.name program_name,sc.name school_name
+       FROM students s JOIN programs p ON p.id=s.program_id JOIN schools sc ON sc.id=s.current_school_id WHERE s.id=$1`,
       [id],
     );
     const item = result.rows[0];

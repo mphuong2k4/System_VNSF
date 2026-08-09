@@ -8,7 +8,7 @@ import {
   TextField,
   Typography,
 } from "@vnsf/ui";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, HttpError } from "../../lib/api";
 
@@ -22,6 +22,8 @@ type Student = {
   grade_level_current?: number;
   status: string;
   version: number;
+  program_name?: string;
+  school_name?: string;
 };
 type Guardian = {
   id: string;
@@ -45,7 +47,11 @@ type IdentityView = {
   version: number;
 };
 
-export function StudentsPage() {
+export function StudentsPage({
+  selfService = false,
+}: {
+  selfService?: boolean;
+}) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const [selected, setSelected] = useState<Student>();
@@ -64,6 +70,9 @@ export function StudentsPage() {
     onError: (cause) =>
       setError(cause instanceof HttpError ? cause.body.code : "INTERNAL_ERROR"),
   });
+  useEffect(() => {
+    if (selfService && query.data?.items[0]) setSelected(query.data.items[0]);
+  }, [query.data, selfService]);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
@@ -81,80 +90,91 @@ export function StudentsPage() {
   }
   return (
     <Stack spacing={3}>
-      <Typography variant="h4">{t("students")}</Typography>
+      <Typography variant="h4">
+        {selfService ? "Hồ sơ học sinh của tôi" : t("students")}
+      </Typography>
       {error && <Alert severity="error">{t(`errors.${error}`)}</Alert>}
-      <Paper sx={{ p: 2 }}>
-        <form onSubmit={submit}>
-          <Stack spacing={1}>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-              {(
-                [
-                  "student_code",
-                  "full_name",
-                  "date_of_birth",
-                  "program_id",
-                  "current_school_id",
-                  "grade_level_current",
-                ] as const
-              ).map((name) => (
-                <TextField
-                  key={name}
-                  name={name}
-                  label={t(`student.fields.${name}`)}
-                  required
-                  type={
-                    name === "date_of_birth"
-                      ? "date"
-                      : name === "grade_level_current"
-                        ? "number"
-                        : "text"
-                  }
-                  InputLabelProps={
-                    name === "date_of_birth" ? { shrink: true } : {}
-                  }
-                />
-              ))}
+      {!selfService && (
+        <Paper sx={{ p: 2 }}>
+          <form onSubmit={submit}>
+            <Stack spacing={1}>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+                {(
+                  [
+                    "student_code",
+                    "full_name",
+                    "date_of_birth",
+                    "program_id",
+                    "current_school_id",
+                    "grade_level_current",
+                  ] as const
+                ).map((name) => (
+                  <TextField
+                    key={name}
+                    name={name}
+                    label={t(`student.fields.${name}`)}
+                    required
+                    type={
+                      name === "date_of_birth"
+                        ? "date"
+                        : name === "grade_level_current"
+                          ? "number"
+                          : "text"
+                    }
+                    InputLabelProps={
+                      name === "date_of_birth" ? { shrink: true } : {}
+                    }
+                  />
+                ))}
+              </Stack>
+              <TextField
+                name="duplicate_override_reason"
+                label={t("student.fields.duplicate_override_reason")}
+                helperText={t("student.duplicateOverrideHelp")}
+              />
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={create.isPending}
+              >
+                {t("student.add")}
+              </Button>
             </Stack>
-            <TextField
-              name="duplicate_override_reason"
-              label={t("student.fields.duplicate_override_reason")}
-              helperText={t("student.duplicateOverrideHelp")}
-            />
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={create.isPending}
-            >
-              {t("student.add")}
-            </Button>
-          </Stack>
-        </form>
-      </Paper>
+          </form>
+        </Paper>
+      )}
       {query.isLoading && <Skeleton height={100} />}
       {query.isError && (
         <Alert severity="error">{t("errors.INTERNAL_ERROR")}</Alert>
       )}
-      {query.data?.items.map((student) => (
-        <Paper variant="outlined" sx={{ p: 2 }} key={student.id}>
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-          >
-            <Typography>
-              {student.student_code} · {student.full_name} · {student.status}
-            </Typography>
-            <Button onClick={() => setSelected(student)}>
-              {t("student.details")}
-            </Button>
-          </Stack>
-        </Paper>
-      ))}
-      {selected && <StudentDetails student={selected} />}
+      {!selfService &&
+        query.data?.items.map((student) => (
+          <Paper variant="outlined" sx={{ p: 2 }} key={student.id}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography>
+                {student.student_code} · {student.full_name} · {student.status}
+              </Typography>
+              <Button onClick={() => setSelected(student)}>
+                {t("student.details")}
+              </Button>
+            </Stack>
+          </Paper>
+        ))}
+      {selected && <StudentDetails student={selected} readOnly={selfService} />}
     </Stack>
   );
 }
-function StudentDetails({ student }: { student: Student }) {
+function StudentDetails({
+  student,
+  readOnly = false,
+}: {
+  student: Student;
+  readOnly?: boolean;
+}) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const [revealedIdentity, setRevealedIdentity] = useState("");
@@ -222,6 +242,29 @@ function StudentDetails({ student }: { student: Student }) {
     <Paper sx={{ p: 2 }}>
       <Stack spacing={2}>
         <Typography variant="h5">{student.full_name}</Typography>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={3}
+          sx={{ p: 2, bgcolor: "#f5f9fe", borderRadius: 2 }}
+        >
+          <Typography>
+            <strong>Mã học sinh:</strong> {student.student_code}
+          </Typography>
+          <Typography>
+            <strong>Ngày sinh:</strong>{" "}
+            {new Date(student.date_of_birth).toLocaleDateString("vi-VN")}
+          </Typography>
+          <Typography>
+            <strong>Khối:</strong> {student.grade_level_current ?? "—"}
+          </Typography>
+          <Typography>
+            <strong>Trường:</strong> {student.school_name ?? "Chưa cập nhật"}
+          </Typography>
+          <Typography>
+            <strong>Chương trình:</strong>{" "}
+            {student.program_name ?? "Chưa cập nhật"}
+          </Typography>
+        </Stack>
         {(addGuardian.isError ||
           transfer.isError ||
           updateIdentity.isError ||
@@ -234,53 +277,61 @@ function StudentDetails({ student }: { student: Student }) {
             identity.data?.identity_masked ||
             t("student.identityMissing")}
         </Typography>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            const data = Object.fromEntries(new FormData(event.currentTarget));
-            updateIdentity.mutate({
-              identity_number: entry(data.identity_number),
-              reason: entry(data.identity_reason),
-            });
-            event.currentTarget.reset();
-          }}
-        >
-          <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-            <TextField
-              name="identity_number"
-              label={t("student.identityNumber")}
-              inputProps={{ inputMode: "numeric", pattern: "[0-9]{9,12}" }}
-              required
-            />
-            <TextField
-              name="identity_reason"
-              label={t("student.identityReason")}
-              required
-            />
-            <Button type="submit" disabled={updateIdentity.isPending}>
-              {t("student.identitySave")}
-            </Button>
-          </Stack>
-        </form>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            const data = Object.fromEntries(new FormData(event.currentTarget));
-            revealIdentity.mutate(entry(data.reveal_reason));
-            event.currentTarget.reset();
-          }}
-        >
-          <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-            <TextField
-              name="reveal_reason"
-              label={t("student.revealReason")}
-              required
-            />
-            <Button type="submit" disabled={revealIdentity.isPending}>
-              {t("student.identityReveal")}
-            </Button>
-          </Stack>
-        </form>
+        {!readOnly && (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const data = Object.fromEntries(
+                new FormData(event.currentTarget),
+              );
+              updateIdentity.mutate({
+                identity_number: entry(data.identity_number),
+                reason: entry(data.identity_reason),
+              });
+              event.currentTarget.reset();
+            }}
+          >
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+              <TextField
+                name="identity_number"
+                label={t("student.identityNumber")}
+                inputProps={{ inputMode: "numeric", pattern: "[0-9]{9,12}" }}
+                required
+              />
+              <TextField
+                name="identity_reason"
+                label={t("student.identityReason")}
+                required
+              />
+              <Button type="submit" disabled={updateIdentity.isPending}>
+                {t("student.identitySave")}
+              </Button>
+            </Stack>
+          </form>
+        )}
+        {!readOnly && (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const data = Object.fromEntries(
+                new FormData(event.currentTarget),
+              );
+              revealIdentity.mutate(entry(data.reveal_reason));
+              event.currentTarget.reset();
+            }}
+          >
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+              <TextField
+                name="reveal_reason"
+                label={t("student.revealReason")}
+                required
+              />
+              <Button type="submit" disabled={revealIdentity.isPending}>
+                {t("student.identityReveal")}
+              </Button>
+            </Stack>
+          </form>
+        )}
         <Typography variant="h6">{t("student.guardians")}</Typography>
         {guardians.isLoading && <Skeleton height={50} />}
         {guardians.data?.map((guardian) => (
@@ -289,47 +340,52 @@ function StudentDetails({ student }: { student: Student }) {
             {guardian.phone_masked ?? guardian.email_masked}
           </Typography>
         ))}
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            const data = Object.fromEntries(new FormData(event.currentTarget));
-            addGuardian.mutate({
-              full_name: entry(data.full_name),
-              relationship: entry(data.relationship),
-              phone: entry(data.phone),
-              is_primary: data.is_primary === "on",
-            });
-            event.currentTarget.reset();
-          }}
-        >
-          <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-            <TextField
-              name="full_name"
-              label={t("student.guardianName")}
-              required
-            />
-            <TextField
-              name="relationship"
-              label={t("student.relationship")}
-              required
-              select
-              SelectProps={{ native: true }}
-            >
-              {["MOTHER", "FATHER", "GUARDIAN", "OTHER"].map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </TextField>
-            <TextField name="phone" label={t("student.phone")} required />
-            <label>
-              <input name="is_primary" type="checkbox" /> {t("student.primary")}
-            </label>
-            <Button type="submit" disabled={addGuardian.isPending}>
-              {t("student.addGuardian")}
-            </Button>
-          </Stack>
-        </form>
+        {!readOnly && (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const data = Object.fromEntries(
+                new FormData(event.currentTarget),
+              );
+              addGuardian.mutate({
+                full_name: entry(data.full_name),
+                relationship: entry(data.relationship),
+                phone: entry(data.phone),
+                is_primary: data.is_primary === "on",
+              });
+              event.currentTarget.reset();
+            }}
+          >
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+              <TextField
+                name="full_name"
+                label={t("student.guardianName")}
+                required
+              />
+              <TextField
+                name="relationship"
+                label={t("student.relationship")}
+                required
+                select
+                SelectProps={{ native: true }}
+              >
+                {["MOTHER", "FATHER", "GUARDIAN", "OTHER"].map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </TextField>
+              <TextField name="phone" label={t("student.phone")} required />
+              <label>
+                <input name="is_primary" type="checkbox" />{" "}
+                {t("student.primary")}
+              </label>
+              <Button type="submit" disabled={addGuardian.isPending}>
+                {t("student.addGuardian")}
+              </Button>
+            </Stack>
+          </form>
+        )}
         <Typography variant="h6">{t("student.schoolHistory")}</Typography>
         {history.isLoading && <Skeleton height={50} />}
         {history.data?.map((item) => (
@@ -338,40 +394,44 @@ function StudentDetails({ student }: { student: Student }) {
             {item.effective_to ?? t("student.current")}
           </Typography>
         ))}
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            const data = Object.fromEntries(new FormData(event.currentTarget));
-            transfer.mutate({
-              target_school_id: entry(data.target_school_id),
-              effective_from: entry(data.effective_from),
-              reason: entry(data.reason),
-            });
-          }}
-        >
-          <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-            <TextField
-              name="target_school_id"
-              label={t("student.targetSchool")}
-              required
-            />
-            <TextField
-              name="effective_from"
-              type="date"
-              label={t("student.effectiveFrom")}
-              required
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              name="reason"
-              label={t("student.transferReason")}
-              required
-            />
-            <Button type="submit" disabled={transfer.isPending}>
-              {t("student.transfer")}
-            </Button>
-          </Stack>
-        </form>
+        {!readOnly && (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const data = Object.fromEntries(
+                new FormData(event.currentTarget),
+              );
+              transfer.mutate({
+                target_school_id: entry(data.target_school_id),
+                effective_from: entry(data.effective_from),
+                reason: entry(data.reason),
+              });
+            }}
+          >
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+              <TextField
+                name="target_school_id"
+                label={t("student.targetSchool")}
+                required
+              />
+              <TextField
+                name="effective_from"
+                type="date"
+                label={t("student.effectiveFrom")}
+                required
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                name="reason"
+                label={t("student.transferReason")}
+                required
+              />
+              <Button type="submit" disabled={transfer.isPending}>
+                {t("student.transfer")}
+              </Button>
+            </Stack>
+          </form>
+        )}
       </Stack>
     </Paper>
   );

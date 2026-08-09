@@ -62,18 +62,10 @@ export function LoginPage() {
         gridTemplateColumns: { xs: "1fr", md: "1.15fr minmax(440px,.85fr)" },
         position: "relative",
         overflow: "hidden",
-        background:
-          "radial-gradient(circle at 8% 8%,rgba(255,205,72,.25),transparent 16%),radial-gradient(circle at 52% 8%,rgba(63,159,255,.10),transparent 30%),linear-gradient(145deg,#fff 0%,#f1f8ff 60%,#edf6ff 100%)",
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          width: 680,
-          height: 680,
-          border: "2px solid rgba(66,146,228,.11)",
-          borderRadius: "50%",
-          top: -360,
-          left: "37%",
-        },
+        backgroundImage:
+          "linear-gradient(rgba(255,255,255,.08),rgba(255,255,255,.08)),url('/assets/vnsf-login-background.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
       }}
     >
       <Box

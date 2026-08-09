@@ -52,6 +52,11 @@ const StudentsPage = lazy(() =>
     default: module.StudentsPage,
   })),
 );
+const StudentDashboardPage = lazy(() =>
+  import("./features/students/StudentDashboardPage.js").then((module) => ({
+    default: module.StudentDashboardPage,
+  })),
+);
 const SubmissionsPage = lazy(() =>
   import("./features/academics/SubmissionsPage.js").then((module) => ({
     default: module.SubmissionsPage,
@@ -147,6 +152,18 @@ const navigation = [
   },
   { path: "/sessions", key: "auth.sessions", mark: "AT" },
 ] as const;
+const studentNavigation = [
+  { path: "/", key: "Cổng học sinh", mark: "01" },
+  { path: "/students", key: "Hồ sơ của tôi", mark: "HS" },
+  { path: "/submissions", key: "Hồ sơ học tập", mark: "HT" },
+  { path: "/transfers", key: "Học bổng của tôi", mark: "CK" },
+  { path: "/assistance", key: "Chi phí và hỗ trợ", mark: "HT" },
+  { path: "/obligations", key: "Gia hạn và thư cảm ơn", mark: "NV" },
+  { path: "/documents", key: "Tài liệu của tôi", mark: "TL" },
+  { path: "/banking", key: "Tài khoản nhận học bổng", mark: "NH" },
+  { path: "/notifications", key: "Thông báo", mark: "TB" },
+  { path: "/sessions", key: "Phiên đăng nhập", mark: "AT" },
+] as const;
 function Shell() {
   const { t, i18n } = useTranslation();
   const location = useLocation();
@@ -196,11 +213,16 @@ function Shell() {
     await api("/auth/logout", { method: "POST" }).catch(() => undefined);
     window.location.assign("/login");
   };
-  const visibleNavigation = navigation.filter(
-    (item) =>
-      !("roles" in item) ||
-      item.roles.some((role) => profile?.roles.includes(role)),
-  );
+  const isStudentOnly =
+    profile?.roles.length === 1 && profile.roles.includes("STUDENT");
+  const translateNavigation = (key: string) => (isStudentOnly ? key : t(key));
+  const visibleNavigation = isStudentOnly
+    ? studentNavigation
+    : navigation.filter(
+        (item) =>
+          !("roles" in item) ||
+          item.roles.some((role) => profile?.roles.includes(role)),
+      );
   const isProgramManager = profile?.roles.some((role) =>
     ["SUPER_ADMIN", "PROGRAM_MANAGER"].includes(role),
   );
@@ -312,7 +334,7 @@ function Shell() {
                 {item.mark}
               </Box>
               <ListItemText
-                primary={t(item.key)}
+                primary={translateNavigation(item.key)}
                 primaryTypographyProps={{
                   fontSize: 14,
                   fontWeight: active ? 750 : 550,
@@ -385,10 +407,11 @@ function Shell() {
           </IconButton>
           <Box sx={{ flexGrow: 1 }}>
             <Typography variant="caption" color="text.secondary">
-              VNSF / {current ? t(current.key) : t("dashboard")}
+              VNSF /{" "}
+              {current ? translateNavigation(current.key) : t("dashboard")}
             </Typography>
             <Typography variant="h6">
-              {current ? t(current.key) : t("dashboard")}
+              {current ? translateNavigation(current.key) : t("dashboard")}
             </Typography>
           </Box>
           <Button
@@ -473,7 +496,10 @@ function Shell() {
               {isProgramManager && (
                 <Route path="/configuration" element={<ConfigurationPage />} />
               )}
-              <Route path="/students" element={<StudentsPage />} />
+              <Route
+                path="/students"
+                element={<StudentsPage selfService={isStudentOnly} />}
+              />
               <Route path="/submissions" element={<SubmissionsPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/banking" element={<BankingPage />} />
@@ -496,9 +522,11 @@ function Shell() {
               <Route
                 path="/"
                 element={
-                  <ReportingPage
-                    manager={profile.roles.some((role) => role !== "STUDENT")}
-                  />
+                  isStudentOnly ? (
+                    <StudentDashboardPage />
+                  ) : (
+                    <ReportingPage manager />
+                  )
                 }
               />
               <Route

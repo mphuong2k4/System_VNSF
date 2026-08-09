@@ -11,6 +11,8 @@ test("student navigation excludes management modules and rejects direct navigati
   await page.locator('input[type="password"]').fill(password);
   await page.locator('button[type="submit"]').click();
   await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByText("Xin chào, Nguyễn Minh Anh")).toBeVisible();
+  await expect(page.getByText("VNSF-2026-001")).toBeVisible();
 
   for (const restrictedPath of [
     "/reporting",
@@ -24,4 +26,15 @@ test("student navigation excludes management modules and rejects direct navigati
   await page.goto("/administration");
   await expect(page).toHaveURL(/\/$/);
   await expect(page.locator('a[href="/administration"]')).toHaveCount(0);
+
+  await page.goto("/students");
+  await expect(
+    page.getByRole("heading", { name: "Hồ sơ học sinh của tôi" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Trường THPT Chuyên Nguyễn Huệ").first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Thêm học sinh|Add student/i }),
+  ).toHaveCount(0);
 });
