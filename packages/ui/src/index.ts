@@ -11,6 +11,7 @@ export {
   Drawer,
   Divider,
   IconButton,
+  InputAdornment,
   List,
   ListItemButton,
   ListItemText,
