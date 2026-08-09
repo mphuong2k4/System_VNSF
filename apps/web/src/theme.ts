@@ -13,7 +13,8 @@ export const vnsfTheme = createTheme({
   },
   shape: { borderRadius: 12 },
   typography: {
-    fontFamily: 'Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    fontFamily:
+      '"Segoe UI Variable", "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif',
     h4: { fontWeight: 750, letterSpacing: "-0.035em" },
     h5: { fontWeight: 700, letterSpacing: "-0.02em" },
     h6: { fontWeight: 700 },
@@ -22,7 +23,12 @@ export const vnsfTheme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
-        body: { minWidth: 320 },
+        html: {
+          WebkitFontSmoothing: "antialiased",
+          MozOsxFontSmoothing: "grayscale",
+          textRendering: "optimizeLegibility",
+        },
+        body: { minWidth: 320, fontFeatureSettings: '"kern" 1, "liga" 1' },
         "::selection": { background: "#cdeeff" },
       },
     },

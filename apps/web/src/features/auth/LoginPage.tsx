@@ -23,6 +23,33 @@ const schema = z.object({
 });
 type Form = z.infer<typeof schema>;
 
+const loginFieldSx = {
+  "& .MuiInputLabel-root": {
+    color: "#607590",
+    fontWeight: 600,
+  },
+  "& .MuiOutlinedInput-root": {
+    minHeight: 54,
+    borderRadius: 3,
+    bgcolor: "#f8fbff",
+    transition: "background-color .2s ease, box-shadow .2s ease",
+    "& fieldset": { borderColor: "#d5e1ef" },
+    "&:hover": {
+      bgcolor: "#ffffff",
+      "& fieldset": { borderColor: "#9eb9d5" },
+    },
+    "&.Mui-focused": {
+      bgcolor: "#ffffff",
+      boxShadow: "0 0 0 4px rgba(7,143,134,.10)",
+      "& fieldset": { borderWidth: 1.5 },
+    },
+  },
+  "& .MuiInputBase-input": {
+    fontSize: 15,
+    fontWeight: 500,
+  },
+};
+
 export function LoginPage() {
   const { t } = useTranslation();
   const [serverError, setServerError] = useState<string>();
@@ -190,34 +217,57 @@ export function LoginPage() {
             sx={{
               display: "grid",
               gridTemplateColumns: "repeat(3,1fr)",
-              gap: 2.5,
-              mt: 2,
+              gap: 1.5,
+              mt: 2.5,
             }}
           >
             {benefits.map((benefit) => (
               <Stack
                 key={benefit.title}
                 direction="row"
-                spacing={1.3}
-                alignItems="flex-start"
+                spacing={1.2}
+                alignItems="center"
+                sx={{
+                  minHeight: 82,
+                  px: 1.5,
+                  py: 1.25,
+                  borderRadius: 3,
+                  bgcolor: "rgba(255,255,255,.94)",
+                  border: "1px solid rgba(205,222,241,.95)",
+                  boxShadow: "0 10px 28px rgba(31,77,128,.10)",
+                }}
               >
                 <Avatar
                   sx={{
+                    width: 40,
+                    height: 40,
                     bgcolor: benefit.background,
                     color: benefit.color,
-                    boxShadow: "0 8px 24px rgba(30,100,170,.12)",
+                    boxShadow: "none",
                   }}
                 >
                   <Icon name={benefit.icon} size={23} />
                 </Avatar>
                 <Box>
-                  <Typography variant="body2" fontWeight={800}>
+                  <Typography
+                    sx={{
+                      color: "#10284d",
+                      fontSize: 14,
+                      fontWeight: 750,
+                      lineHeight: 1.25,
+                    }}
+                  >
                     {benefit.title}
                   </Typography>
                   <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", lineHeight: 1.4, mt: 0.25 }}
+                    sx={{
+                      display: "block",
+                      color: "#526985",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      lineHeight: 1.35,
+                      mt: 0.4,
+                    }}
                   >
                     {benefit.detail}
                   </Typography>
@@ -233,31 +283,69 @@ export function LoginPage() {
       >
         <Paper
           sx={{
+            position: "relative",
+            overflow: "hidden",
             width: "100%",
-            maxWidth: 560,
-            p: { xs: 3, sm: 5 },
-            borderRadius: 5,
-            bgcolor: "rgba(255,255,255,.94)",
-            backdropFilter: "blur(8px)",
-            boxShadow: "0 28px 80px rgba(35,82,138,.14)",
+            maxWidth: 530,
+            p: { xs: 3, sm: 5.5 },
+            borderRadius: { xs: 4, sm: "30px" },
+            bgcolor: "rgba(255,255,255,.985)",
+            border: "1px solid rgba(255,255,255,.95)",
+            boxShadow:
+              "0 30px 90px rgba(25,67,116,.18), 0 2px 8px rgba(25,67,116,.06)",
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              inset: "0 0 auto",
+              height: 5,
+              background: "linear-gradient(90deg,#078f86,#1596df,#e3a008)",
+            },
           }}
         >
           <Stack
             component="form"
-            spacing={2.3}
+            spacing={2.2}
             onSubmit={(event) => void submit(event)}
             noValidate
           >
-            <Box sx={{ textAlign: "center" }}>
+            <Box sx={{ textAlign: "center", mb: 0.5 }}>
+              <Box
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.8,
+                  px: 1.5,
+                  py: 0.65,
+                  mb: 2,
+                  borderRadius: 99,
+                  color: "#087c77",
+                  bgcolor: "#eaf8f6",
+                  border: "1px solid #cdece8",
+                }}
+              >
+                <Icon name="lock" size={16} />
+                <Typography
+                  variant="caption"
+                  sx={{ fontWeight: 750, letterSpacing: ".06em" }}
+                >
+                  CỔNG THÔNG TIN VNSF
+                </Typography>
+              </Box>
               <Typography
                 variant="h3"
-                sx={{ fontSize: { xs: 30, sm: 36 }, fontWeight: 750 }}
+                sx={{
+                  color: "#10284d",
+                  fontSize: { xs: 30, sm: 38 },
+                  fontWeight: 750,
+                  letterSpacing: "-.025em",
+                  lineHeight: 1.15,
+                }}
               >
                 Đăng nhập hệ thống
               </Typography>
               <Typography
                 color="text.secondary"
-                sx={{ mt: 1, fontSize: { xs: 14, sm: 16 }, fontWeight: 500 }}
+                sx={{ mt: 1.2, fontSize: { xs: 14, sm: 16 }, fontWeight: 500 }}
               >
                 Vui lòng đăng nhập để tiếp tục.
               </Typography>
@@ -274,6 +362,7 @@ export function LoginPage() {
               autoFocus
               error={!!errors.email}
               helperText={errors.email && t("errors.VALIDATION_EMAIL")}
+              sx={loginFieldSx}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -292,6 +381,7 @@ export function LoginPage() {
               autoComplete="current-password"
               error={!!errors.password}
               helperText={errors.password && t("errors.VALIDATION_PASSWORD")}
+              sx={loginFieldSx}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -341,9 +431,14 @@ export function LoginPage() {
               disabled={isSubmitting}
               sx={{
                 py: 1.2,
+                minHeight: 54,
+                borderRadius: 3,
+                fontSize: 16,
                 background: "linear-gradient(90deg,#078f86,#138fe0)",
+                boxShadow: "0 12px 26px rgba(12,139,158,.22)",
                 "&:hover": {
                   background: "linear-gradient(90deg,#06776f,#087ccb)",
+                  boxShadow: "0 14px 30px rgba(12,139,158,.28)",
                 },
               }}
             >
