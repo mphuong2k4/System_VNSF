@@ -3,10 +3,10 @@ import { createTheme } from "@vnsf/ui";
 export const vnsfTheme = createTheme({
   palette: {
     mode: "light",
-    primary: { main: "#0b5d55", dark: "#073f3a", light: "#d9f0ec" },
-    secondary: { main: "#d69e2e", dark: "#9c6d10", light: "#fff3d6" },
-    background: { default: "#f4f7f6", paper: "#ffffff" },
-    text: { primary: "#172b2a", secondary: "#607271" },
+    primary: { main: "#078f86", dark: "#076b66", light: "#d9f5f2" },
+    secondary: { main: "#e3a008", dark: "#aa7400", light: "#fff4ce" },
+    background: { default: "#f4f9ff", paper: "#ffffff" },
+    text: { primary: "#10284d", secondary: "#657792" },
     success: { main: "#23855b" },
     warning: { main: "#d38716" },
     error: { main: "#c23b3b" },
@@ -23,14 +23,14 @@ export const vnsfTheme = createTheme({
     MuiCssBaseline: {
       styleOverrides: {
         body: { minWidth: 320 },
-        "::selection": { background: "#bfe3dd" },
+        "::selection": { background: "#cdeeff" },
       },
     },
     MuiPaper: {
       styleOverrides: {
         root: {
-          border: "1px solid #e3ebe9",
-          boxShadow: "0 8px 30px rgba(18, 58, 54, 0.06)",
+          border: "1px solid #e4edf8",
+          boxShadow: "0 10px 32px rgba(38, 86, 143, 0.07)",
         },
       },
     },

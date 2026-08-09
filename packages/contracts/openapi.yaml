@@ -1188,7 +1188,7 @@ paths:
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /auth/profile/preferences:
     get:
-      summary: Read the authenticated user's locale preference
+      summary: Read the authenticated user's locale, identity scope and effective roles
       operationId: getProfilePreferences
       security: [{ sessionCookie: [] }]
       responses:

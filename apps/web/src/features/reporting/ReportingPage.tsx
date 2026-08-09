@@ -39,7 +39,7 @@ type Job = {
   download_url?: string;
 };
 
-export function ReportingPage() {
+export function ReportingPage({ manager = false }: { manager?: boolean }) {
   const { t } = useTranslation();
   const [dashboard, setDashboard] = useState<Dashboard>({});
   const [summary, setSummary] = useState<Summary[]>([]);
@@ -52,8 +52,12 @@ export function ReportingPage() {
     try {
       const [metrics, report, dataJobs] = await Promise.all([
         api<Dashboard>("/dashboard"),
-        api<Summary[]>("/reports/scholarship-summary").catch(() => []),
-        api<Job[]>("/data-jobs").catch(() => []),
+        manager
+          ? api<Summary[]>("/reports/scholarship-summary").catch(() => [])
+          : Promise.resolve([]),
+        manager
+          ? api<Job[]>("/data-jobs").catch(() => [])
+          : Promise.resolve([]),
       ]);
       setDashboard(metrics);
       setSummary(report);
@@ -65,7 +69,7 @@ export function ReportingPage() {
   };
   useEffect(() => {
     void load();
-  }, []);
+  }, [manager]);
   const startExport = async (resource_type: string) => {
     try {
       await api("/exports", {
@@ -155,154 +159,170 @@ export function ReportingPage() {
           </Paper>
         ))}
       </Box>
-      <Paper sx={{ overflow: "hidden" }}>
-        <Box
-          sx={{
-            px: 3,
-            py: 2.5,
-            borderBottom: "1px solid",
-            borderColor: "divider",
-          }}
-        >
-          <Typography variant="h5">{t("reporting.summary")}</Typography>
-        </Box>
-        <TableContainer>
-          <Table aria-label={t("reporting.summary")}>
-            <TableHead>
-              <TableRow>
-                <TableCell>{t("reporting.summary")}</TableCell>
-                <TableCell align="right">{t("reporting.students")}</TableCell>
-                <TableCell align="right">{t("reporting.approved")}</TableCell>
-                <TableCell align="right">{t("reporting.pending")}</TableCell>
-                <TableCell align="right">VND</TableCell>
-                <TableCell align="right">USD</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {summary.map((row) => (
-                <TableRow key={row.school_id} hover>
-                  <TableCell>
-                    <Typography fontWeight={750}>{row.school_name}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {row.school_code}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">{row.students}</TableCell>
-                  <TableCell align="right">
-                    {row.approved_submissions}
-                  </TableCell>
-                  <TableCell align="right">
-                    <Chip
-                      size="small"
-                      color={row.pending_submissions ? "warning" : "success"}
-                      label={row.pending_submissions}
-                    />
-                  </TableCell>
-                  <TableCell align="right">{row.transferred_vnd}</TableCell>
-                  <TableCell align="right">{row.transferred_usd}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
-          gap: 3,
-        }}
-      >
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h5">{t("reporting.exports")}</Typography>
-          <Typography
-            color="text.secondary"
-            variant="body2"
-            sx={{ mt: 1, mb: 2.5 }}
-          >
-            {t("notice")}
-          </Typography>
-          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            {["STUDENTS", "SUBMISSIONS", "TRANSFERS"].map((type) => (
-              <Button
-                variant="outlined"
-                key={type}
-                onClick={() => void startExport(type)}
-              >
-                {t("reporting.export")} {type}
-              </Button>
-            ))}
-          </Stack>
-        </Paper>
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h5">{t("reporting.importStudents")}</Typography>
-          <TextField
-            sx={{ mt: 2 }}
-            fullWidth
-            multiline
-            minRows={4}
-            value={rows}
-            onChange={(event) => setRows(event.target.value)}
-            label={t("reporting.rowsJson")}
-          />
-          <Button
-            variant="contained"
-            sx={{ mt: 2 }}
-            onClick={() => void startImport()}
-          >
-            {t("reporting.validate")}
-          </Button>
-        </Paper>
-      </Box>
-      <Stack direction="row" alignItems="center" justifyContent="space-between">
-        <Typography variant="h5">{t("reporting.jobs")}</Typography>
-        <Button variant="outlined" onClick={() => void load()}>
-          {t("reporting.refresh")}
-        </Button>
-      </Stack>
-      <Stack spacing={1.5}>
-        {jobs.map((job) => (
-          <Paper
-            key={job.id}
+      {manager && (
+        <Paper sx={{ overflow: "hidden" }}>
+          <Box
             sx={{
-              p: 2.5,
-              display: { sm: "flex" },
-              alignItems: "center",
-              gap: 2,
+              px: 3,
+              py: 2.5,
+              borderBottom: "1px solid",
+              borderColor: "divider",
             }}
           >
-            <Box sx={{ flexGrow: 1 }}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography fontWeight={800}>{job.resource_type}</Typography>
-                <Chip
-                  size="small"
-                  label={job.status}
-                  color={
-                    job.status === "FAILED"
-                      ? "error"
-                      : job.status === "COMPLETED"
-                        ? "success"
-                        : "default"
-                  }
-                />
-              </Stack>
-              <Typography variant="caption" color="text.secondary">
-                {job.kind} · {job.id}
-              </Typography>
-            </Box>
-            {job.status === "VALIDATED" && (
-              <Button onClick={() => void confirm(job.id)}>
-                {t("reporting.confirm")}
-              </Button>
-            )}
-            {job.download_url && (
-              <Button component="a" href={job.download_url}>
-                {t("reporting.download")}
-              </Button>
-            )}
+            <Typography variant="h5">{t("reporting.summary")}</Typography>
+          </Box>
+          <TableContainer>
+            <Table aria-label={t("reporting.summary")}>
+              <TableHead>
+                <TableRow>
+                  <TableCell>{t("reporting.summary")}</TableCell>
+                  <TableCell align="right">{t("reporting.students")}</TableCell>
+                  <TableCell align="right">{t("reporting.approved")}</TableCell>
+                  <TableCell align="right">{t("reporting.pending")}</TableCell>
+                  <TableCell align="right">VND</TableCell>
+                  <TableCell align="right">USD</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {summary.map((row) => (
+                  <TableRow key={row.school_id} hover>
+                    <TableCell>
+                      <Typography fontWeight={750}>
+                        {row.school_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {row.school_code}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">{row.students}</TableCell>
+                    <TableCell align="right">
+                      {row.approved_submissions}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Chip
+                        size="small"
+                        color={row.pending_submissions ? "warning" : "success"}
+                        label={row.pending_submissions}
+                      />
+                    </TableCell>
+                    <TableCell align="right">{row.transferred_vnd}</TableCell>
+                    <TableCell align="right">{row.transferred_usd}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
+      {manager && (
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
+            gap: 3,
+          }}
+        >
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h5">{t("reporting.exports")}</Typography>
+            <Typography
+              color="text.secondary"
+              variant="body2"
+              sx={{ mt: 1, mb: 2.5 }}
+            >
+              {t("notice")}
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              {["STUDENTS", "SUBMISSIONS", "TRANSFERS"].map((type) => (
+                <Button
+                  variant="outlined"
+                  key={type}
+                  onClick={() => void startExport(type)}
+                >
+                  {t("reporting.export")} {type}
+                </Button>
+              ))}
+            </Stack>
           </Paper>
-        ))}
-      </Stack>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h5">
+              {t("reporting.importStudents")}
+            </Typography>
+            <TextField
+              sx={{ mt: 2 }}
+              fullWidth
+              multiline
+              minRows={4}
+              value={rows}
+              onChange={(event) => setRows(event.target.value)}
+              label={t("reporting.rowsJson")}
+            />
+            <Button
+              variant="contained"
+              sx={{ mt: 2 }}
+              onClick={() => void startImport()}
+            >
+              {t("reporting.validate")}
+            </Button>
+          </Paper>
+        </Box>
+      )}
+      {manager && (
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <Typography variant="h5">{t("reporting.jobs")}</Typography>
+          <Button variant="outlined" onClick={() => void load()}>
+            {t("reporting.refresh")}
+          </Button>
+        </Stack>
+      )}
+      {manager && (
+        <Stack spacing={1.5}>
+          {jobs.map((job) => (
+            <Paper
+              key={job.id}
+              sx={{
+                p: 2.5,
+                display: { sm: "flex" },
+                alignItems: "center",
+                gap: 2,
+              }}
+            >
+              <Box sx={{ flexGrow: 1 }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography fontWeight={800}>{job.resource_type}</Typography>
+                  <Chip
+                    size="small"
+                    label={job.status}
+                    color={
+                      job.status === "FAILED"
+                        ? "error"
+                        : job.status === "COMPLETED"
+                          ? "success"
+                          : "default"
+                    }
+                  />
+                </Stack>
+                <Typography variant="caption" color="text.secondary">
+                  {job.kind} · {job.id}
+                </Typography>
+              </Box>
+              {job.status === "VALIDATED" && (
+                <Button onClick={() => void confirm(job.id)}>
+                  {t("reporting.confirm")}
+                </Button>
+              )}
+              {job.download_url && (
+                <Button component="a" href={job.download_url}>
+                  {t("reporting.download")}
+                </Button>
+              )}
+            </Paper>
+          ))}
+        </Stack>
+      )}
     </Stack>
   );
 }

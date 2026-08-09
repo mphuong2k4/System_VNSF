@@ -168,8 +168,11 @@ suite("privileged access administration", () => {
     await expect(identity.updatePreferences(auth, "en-US")).resolves.toEqual({
       preferred_locale: "en-US",
     });
-    await expect(identity.preferences(auth)).resolves.toEqual({
+    await expect(identity.preferences(auth)).resolves.toMatchObject({
       preferred_locale: "en-US",
+      roles: ["SUPER_ADMIN"],
+      student_id: null,
+      mfa_enabled: false,
     });
   });
 });

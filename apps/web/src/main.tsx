@@ -104,6 +104,13 @@ const AdministrationPage = lazy(() =>
 );
 const query = new QueryClient();
 const drawerWidth = 272;
+type Profile = {
+  preferred_locale: "vi-VN" | "en-US";
+  roles: string[];
+  school_ids: string[];
+  student_id: string | null;
+  mfa_enabled: boolean;
+};
 const navigation = [
   { path: "/", key: "dashboard", mark: "01" },
   { path: "/students", key: "students", mark: "HS" },
@@ -114,10 +121,30 @@ const navigation = [
   { path: "/documents", key: "documents.title", mark: "TL" },
   { path: "/banking", key: "banking.title", mark: "NH" },
   { path: "/notifications", key: "notifications.title", mark: "TB" },
-  { path: "/reporting", key: "reporting.title", mark: "BC" },
-  { path: "/configuration", key: "configuration.title", mark: "CH" },
-  { path: "/governance", key: "governance.title", mark: "QT" },
-  { path: "/administration", key: "administration.title", mark: "QT" },
+  {
+    path: "/reporting",
+    key: "reporting.title",
+    mark: "BC",
+    roles: ["SUPER_ADMIN", "PROGRAM_MANAGER", "SCHOOL_MANAGER"],
+  },
+  {
+    path: "/configuration",
+    key: "configuration.title",
+    mark: "CH",
+    roles: ["SUPER_ADMIN", "PROGRAM_MANAGER"],
+  },
+  {
+    path: "/governance",
+    key: "governance.title",
+    mark: "QT",
+    roles: ["SUPER_ADMIN"],
+  },
+  {
+    path: "/administration",
+    key: "administration.title",
+    mark: "QT",
+    roles: ["SUPER_ADMIN"],
+  },
   { path: "/sessions", key: "auth.sessions", mark: "AT" },
 ] as const;
 function Shell() {
@@ -125,7 +152,7 @@ function Shell() {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
+  const [profile, setProfile] = useState<Profile>();
   useEffect(() => {
     const redirectToAuthentication = (event?: Event) => {
       const code = (event as CustomEvent<{ code?: string }> | undefined)?.detail
@@ -142,16 +169,14 @@ function Shell() {
       AUTHENTICATION_REQUIRED_EVENT,
       redirectToAuthentication,
     );
-    void api<{ preferred_locale: "vi-VN" | "en-US" }>(
-      "/auth/profile/preferences",
-    )
+    void api<Profile>("/auth/profile/preferences")
       .then(async (profile) => {
         await i18n.changeLanguage(profile.preferred_locale);
-        setAuthenticated(true);
+        setProfile(profile);
       })
       .catch((error: unknown) => {
         if (!(error instanceof HttpError) || error.status !== 401)
-          setAuthenticated(true);
+          void navigate("/login", { replace: true });
       });
     return () =>
       window.removeEventListener(
@@ -171,7 +196,31 @@ function Shell() {
     await api("/auth/logout", { method: "POST" }).catch(() => undefined);
     window.location.assign("/login");
   };
-  if (!authenticated)
+  const visibleNavigation = navigation.filter(
+    (item) =>
+      !("roles" in item) ||
+      item.roles.some((role) => profile?.roles.includes(role)),
+  );
+  const isProgramManager = profile?.roles.some((role) =>
+    ["SUPER_ADMIN", "PROGRAM_MANAGER"].includes(role),
+  );
+  const isReportingManager = profile?.roles.some((role) =>
+    ["SUPER_ADMIN", "PROGRAM_MANAGER", "SCHOOL_MANAGER"].includes(role),
+  );
+  const isSuperAdmin = profile?.roles.includes("SUPER_ADMIN");
+  useEffect(() => {
+    if (!profile) return;
+    const requested = navigation.find(
+      (item) => item.path !== "/" && location.pathname.startsWith(item.path),
+    );
+    if (
+      requested &&
+      "roles" in requested &&
+      !requested.roles.some((role) => profile.roles.includes(role))
+    )
+      void navigate("/", { replace: true });
+  }, [location.pathname, navigate, profile]);
+  if (!profile)
     return (
       <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
         <Stack spacing={2} sx={{ width: "min(420px, 80vw)" }}>
@@ -180,7 +229,7 @@ function Shell() {
         </Stack>
       </Box>
     );
-  const current = navigation.find((item) =>
+  const current = visibleNavigation.find((item) =>
     item.path === "/"
       ? location.pathname === "/"
       : location.pathname.startsWith(item.path),
@@ -191,27 +240,27 @@ function Shell() {
         sx={{ px: 3, py: 2.5, display: "flex", alignItems: "center", gap: 1.5 }}
       >
         <Avatar
-          sx={{ bgcolor: "secondary.main", color: "#17332f", fontWeight: 900 }}
+          sx={{ bgcolor: "secondary.main", color: "white", fontWeight: 900 }}
         >
           V
         </Avatar>
         <Box>
-          <Typography variant="h6" sx={{ color: "white", lineHeight: 1.1 }}>
+          <Typography variant="h6" sx={{ color: "#17366d", lineHeight: 1.1 }}>
             VNSF
           </Typography>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,.64)" }}>
+          <Typography variant="caption" color="text.secondary">
             Scholarship Management
           </Typography>
         </Box>
       </Box>
-      <Divider sx={{ borderColor: "rgba(255,255,255,.1)" }} />
+      <Divider />
       <Typography
         variant="overline"
         sx={{
           px: 3,
           pt: 2.5,
           pb: 1,
-          color: "rgba(255,255,255,.5)",
+          color: "#7a8da8",
           letterSpacing: ".12em",
         }}
       >
@@ -222,7 +271,7 @@ function Shell() {
         aria-label={t("primaryNavigation")}
         sx={{ px: 1.5, py: 0, overflowY: "auto" }}
       >
-        {navigation.map((item) => {
+        {visibleNavigation.map((item) => {
           const active =
             item.path === "/"
               ? location.pathname === "/"
@@ -237,13 +286,13 @@ function Shell() {
               sx={{
                 mb: 0.5,
                 borderRadius: 2,
-                color: "rgba(255,255,255,.76)",
+                color: "#526985",
                 "&.Mui-selected": {
-                  bgcolor: "rgba(255,255,255,.13)",
-                  color: "white",
-                  "&:hover": { bgcolor: "rgba(255,255,255,.17)" },
+                  bgcolor: "#e7f5ff",
+                  color: "#087f79",
+                  "&:hover": { bgcolor: "#dcefff" },
                 },
-                "&:hover": { bgcolor: "rgba(255,255,255,.08)", color: "white" },
+                "&:hover": { bgcolor: "#f0f7ff", color: "#17366d" },
               }}
             >
               <Box
@@ -254,8 +303,8 @@ function Shell() {
                   placeItems: "center",
                   mr: 1.5,
                   borderRadius: 1.5,
-                  bgcolor: active ? "secondary.main" : "rgba(255,255,255,.08)",
-                  color: active ? "#17332f" : "inherit",
+                  bgcolor: active ? "#d7f2ef" : "#edf3fa",
+                  color: active ? "#087f79" : "inherit",
                   fontSize: 11,
                   fontWeight: 900,
                 }}
@@ -277,13 +326,13 @@ function Shell() {
         <Paper
           sx={{
             p: 1.5,
-            bgcolor: "rgba(255,255,255,.08)",
-            borderColor: "rgba(255,255,255,.08)",
-            color: "white",
+            bgcolor: "#f2f8ff",
+            borderColor: "#deebf7",
+            color: "#17366d",
             boxShadow: "none",
           }}
         >
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,.55)" }}>
+          <Typography variant="caption" color="text.secondary">
             {t("common.systemStatus")}
           </Typography>
           <Typography variant="body2" sx={{ fontWeight: 700 }}>
@@ -381,8 +430,8 @@ function Shell() {
             display: { xs: "block", md: "none" },
             "& .MuiDrawer-paper": {
               width: drawerWidth,
-              bgcolor: "#092f2c",
-              border: 0,
+              bgcolor: "#ffffff",
+              borderRight: "1px solid #e2ebf5",
             },
           }}
         >
@@ -395,8 +444,8 @@ function Shell() {
             display: { xs: "none", md: "block" },
             "& .MuiDrawer-paper": {
               width: drawerWidth,
-              bgcolor: "#092f2c",
-              border: 0,
+              bgcolor: "#ffffff",
+              borderRight: "1px solid #e2ebf5",
             },
           }}
         >
@@ -421,7 +470,9 @@ function Shell() {
           >
             <Routes>
               <Route path="/sessions" element={<SessionsPage />} />
-              <Route path="/configuration" element={<ConfigurationPage />} />
+              {isProgramManager && (
+                <Route path="/configuration" element={<ConfigurationPage />} />
+              )}
               <Route path="/students" element={<StudentsPage />} />
               <Route path="/submissions" element={<SubmissionsPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
@@ -430,10 +481,26 @@ function Shell() {
               <Route path="/assistance" element={<AssistancePage />} />
               <Route path="/obligations" element={<ObligationsPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
-              <Route path="/reporting" element={<ReportingPage />} />
-              <Route path="/governance" element={<GovernancePage />} />
-              <Route path="/administration" element={<AdministrationPage />} />
-              <Route path="/" element={<ReportingPage />} />
+              {isReportingManager && (
+                <Route path="/reporting" element={<ReportingPage manager />} />
+              )}
+              {isSuperAdmin && (
+                <Route path="/governance" element={<GovernancePage />} />
+              )}
+              {isSuperAdmin && (
+                <Route
+                  path="/administration"
+                  element={<AdministrationPage />}
+                />
+              )}
+              <Route
+                path="/"
+                element={
+                  <ReportingPage
+                    manager={profile.roles.some((role) => role !== "STUDENT")}
+                  />
+                }
+              />
               <Route
                 path="*"
                 element={

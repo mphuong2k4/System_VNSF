@@ -6,6 +6,10 @@ const schema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   APP_TIMEZONE: z.literal("Asia/Ho_Chi_Minh"),
   SUPPORTED_LOCALES: z.literal("vi-VN,en-US"),
+  MFA_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
   DATABASE_URL: z.string().startsWith("postgresql://"),
   REDIS_URL: z.string().startsWith("redis"),
   SESSION_SECRET_CURRENT: z.string().min(32),

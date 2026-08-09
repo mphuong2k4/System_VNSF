@@ -68,7 +68,7 @@ export class SessionGuard implements CanActivate {
       ALLOW_PENDING_MFA,
       [context.getHandler(), context.getClass()],
     );
-    if (!allowPending && !request.auth.mfaVerified)
+    if (this.config.MFA_ENABLED && !allowPending && !request.auth.mfaVerified)
       throw new DomainError("AUTH_MFA_REQUIRED", 401);
     await this.applyRateLimit(request, request.auth.userId);
     return true;

@@ -7,6 +7,7 @@ import { DatabaseService } from "../../database/database.service.js";
 import { DomainError } from "../../platform/error.filter.js";
 import { CryptoService } from "./crypto.service.js";
 import type { AuthContext } from "./session.guard.js";
+import { loadConfig } from "@vnsf/config";
 type UserRow = {
   id: string;
   email: string;
@@ -30,6 +31,7 @@ type AuthRow = SessionRow & {
 };
 @Injectable()
 export class IdentityService {
+  private readonly config = loadConfig();
   constructor(
     private readonly db: DatabaseService,
     private readonly crypto: CryptoService,
@@ -57,7 +59,10 @@ export class IdentityService {
       `UPDATE users SET failed_count=0,locked_until=NULL WHERE id=$1`,
       [user.id],
     );
-    return this.createSession(user.id, !user.requires_mfa);
+    return this.createSession(
+      user.id,
+      !this.config.MFA_ENABLED || !user.requires_mfa,
+    );
   }
   async createSession(userId: string, mfaVerified: boolean) {
     return this.db.transaction((client) =>
@@ -330,7 +335,13 @@ export class IdentityService {
       )
     ).rows[0];
     if (!row) throw new DomainError("AUTH_REQUIRED", 401);
-    return row;
+    return {
+      ...row,
+      roles: auth.roles,
+      school_ids: auth.schoolIds,
+      student_id: auth.studentId ?? null,
+      mfa_enabled: this.config.MFA_ENABLED,
+    };
   }
   async updatePreferences(
     auth: AuthContext,

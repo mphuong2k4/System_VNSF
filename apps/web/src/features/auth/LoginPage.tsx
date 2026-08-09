@@ -13,13 +13,15 @@ import {
   Typography,
 } from "@vnsf/ui";
 import { useTranslation } from "react-i18next";
-import { api, HttpError } from "../../lib/api";
 import { Link } from "react-router";
+import { api, HttpError } from "../../lib/api";
+
 const schema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 });
 type Form = z.infer<typeof schema>;
+
 export function LoginPage() {
   const { t } = useTranslation();
   const [serverError, setServerError] = useState<string>();
@@ -43,9 +45,7 @@ export function LoginPage() {
       if (result.mfa_required) {
         sessionStorage.setItem("vnsf_return_to", returnTo);
         location.assign(`/mfa?returnTo=${encodeURIComponent(returnTo)}`);
-      } else {
-        location.assign(returnTo);
-      }
+      } else location.assign(returnTo);
     } catch (error) {
       setServerError(
         error instanceof HttpError
@@ -59,8 +59,21 @@ export function LoginPage() {
       sx={{
         minHeight: "100vh",
         display: "grid",
-        gridTemplateColumns: { xs: "1fr", md: "minmax(360px, .9fr) 1.1fr" },
-        bgcolor: "background.default",
+        gridTemplateColumns: { xs: "1fr", md: "1.15fr minmax(440px,.85fr)" },
+        position: "relative",
+        overflow: "hidden",
+        background:
+          "radial-gradient(circle at 8% 8%,rgba(255,205,72,.25),transparent 16%),radial-gradient(circle at 52% 8%,rgba(63,159,255,.10),transparent 30%),linear-gradient(145deg,#fff 0%,#f1f8ff 60%,#edf6ff 100%)",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          width: 680,
+          height: 680,
+          border: "2px solid rgba(66,146,228,.11)",
+          borderRadius: "50%",
+          top: -360,
+          left: "37%",
+        },
       }}
     >
       <Box
@@ -69,97 +82,140 @@ export function LoginPage() {
           display: { xs: "none", md: "flex" },
           flexDirection: "column",
           justifyContent: "space-between",
-          p: { md: 6, lg: 9 },
-          color: "white",
-          background:
-            "radial-gradient(circle at 15% 10%, rgba(211,166,44,.28), transparent 34%), linear-gradient(145deg, #0b4f49 0%, #082d2a 72%)",
+          p: { md: 6, lg: "7vh 8vw" },
+          zIndex: 1,
         }}
       >
         <Stack direction="row" spacing={1.5} alignItems="center">
           <Avatar
-            sx={{
-              bgcolor: "secondary.main",
-              color: "#17332f",
-              fontWeight: 900,
-            }}
+            sx={{ bgcolor: "secondary.main", color: "white", fontWeight: 900 }}
           >
             V
           </Avatar>
           <Box>
-            <Typography variant="h5" sx={{ lineHeight: 1, color: "white" }}>
+            <Typography variant="h5" sx={{ lineHeight: 1, color: "#143575" }}>
               VNSF
             </Typography>
-            <Typography
-              variant="caption"
-              sx={{ color: "rgba(255,255,255,.65)" }}
-            >
+            <Typography variant="caption" color="text.secondary">
               Vietnam Scholarship Foundation
             </Typography>
           </Box>
         </Stack>
-        <Box sx={{ maxWidth: 560 }}>
+        <Box sx={{ maxWidth: 650 }}>
           <Typography
             variant="overline"
-            sx={{ color: "secondary.light", letterSpacing: ".15em" }}
+            sx={{ color: "#1686d9", letterSpacing: ".1em", fontWeight: 800 }}
           >
-            Scholarship Management System
+            🎓 Hệ thống quản lý học bổng
           </Typography>
           <Typography
             variant="h2"
             sx={{
               mt: 2,
               mb: 3,
-              color: "white",
+              color: "#17366d",
               fontSize: { md: 42, lg: 54 },
               lineHeight: 1.08,
             }}
           >
-            {t("common.securePlatform")}
+            Nền tảng quản lý học bổng
+            <Box
+              component="span"
+              sx={{ display: "block", color: "primary.main" }}
+            >
+              hiện đại, minh bạch và hiệu quả
+            </Box>
           </Typography>
           <Typography
-            sx={{ color: "rgba(255,255,255,.7)", maxWidth: 480, fontSize: 17 }}
+            color="text.secondary"
+            sx={{ maxWidth: 520, fontSize: 17, lineHeight: 1.7 }}
           >
-            VNSF kết nối dữ liệu học sinh, kết quả học tập và hỗ trợ tài chính
-            trong một quy trình thống nhất.
+            Quản lý học sinh, hồ sơ học tập, hỗ trợ tài chính và báo cáo trên
+            một nền tảng thống nhất.
           </Typography>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3,1fr)",
+              gap: 2,
+              mt: 5,
+            }}
+          >
+            {[
+              ["✓", "Minh bạch dữ liệu"],
+              ["◎", "Quản lý tập trung"],
+              ["↗", "Báo cáo trực quan"],
+            ].map(([icon, label]) => (
+              <Stack
+                key={label}
+                direction="row"
+                spacing={1.2}
+                alignItems="center"
+              >
+                <Avatar
+                  sx={{
+                    bgcolor: "white",
+                    color: "primary.main",
+                    boxShadow: "0 8px 24px rgba(30,100,170,.12)",
+                  }}
+                >
+                  {icon}
+                </Avatar>
+                <Typography variant="body2" fontWeight={750}>
+                  {label}
+                </Typography>
+              </Stack>
+            ))}
+          </Box>
         </Box>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,.5)" }}>
-          © VNSF · Scholarship operations platform
+        <Typography variant="caption" color="text.secondary">
+          © 2026 VNSF · Vietnam Scholarship Foundation
         </Typography>
       </Box>
       <Box
         component="main"
-        sx={{ display: "grid", placeItems: "center", p: { xs: 2.5, sm: 5 } }}
+        sx={{
+          display: "grid",
+          placeItems: "center",
+          p: { xs: 2.5, sm: 5 },
+          zIndex: 1,
+        }}
       >
         <Paper
           sx={{
             width: "100%",
-            maxWidth: 480,
-            p: { xs: 3, sm: 5 },
-            boxShadow: "0 24px 70px rgba(15,50,47,.12)",
+            maxWidth: 560,
+            p: { xs: 3, sm: 6 },
+            borderRadius: 5,
+            boxShadow: "0 28px 80px rgba(35,82,138,.14)",
           }}
         >
           <Stack
             component="form"
-            spacing={3}
+            spacing={2.5}
             onSubmit={(event) => void submit(event)}
             noValidate
           >
             <Avatar
               sx={{
-                display: { md: "none" },
-                bgcolor: "primary.main",
+                mx: "auto",
+                width: 68,
+                height: 68,
+                bgcolor: "secondary.main",
+                color: "white",
+                fontSize: 31,
                 fontWeight: 900,
+                border: "8px solid #f1f7ff",
               }}
             >
               V
             </Avatar>
-            <Box>
-              <Typography variant="h3" sx={{ fontSize: { xs: 30, sm: 36 } }}>
-                {t("auth.login")}
+            <Box sx={{ textAlign: "center" }}>
+              <Typography variant="h3" sx={{ fontSize: { xs: 28, sm: 34 } }}>
+                Đăng nhập hệ thống
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 1 }}>
-                {t("common.signInHint")}
+                Vui lòng đăng nhập để tiếp tục quản lý chương trình học bổng.
               </Typography>
             </Box>
             {serverError && (
@@ -183,11 +239,36 @@ export function LoginPage() {
               helperText={errors.password && t("errors.VALIDATION_PASSWORD")}
               {...register("password")}
             />
+            <Box
+              component="label"
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                color: "text.secondary",
+                cursor: "pointer",
+              }}
+            >
+              <Box
+                component="input"
+                type="checkbox"
+                defaultChecked
+                sx={{ width: 17, height: 17, accentColor: "#078f86" }}
+              />
+              <Typography variant="body2">Ghi nhớ đăng nhập</Typography>
+            </Box>
             <Button
               type="submit"
               variant="contained"
               size="large"
               disabled={isSubmitting}
+              sx={{
+                py: 1.35,
+                background: "linear-gradient(90deg,#078f86,#138fe0)",
+                "&:hover": {
+                  background: "linear-gradient(90deg,#06776f,#087ccb)",
+                },
+              }}
             >
               {isSubmitting ? t("common.loading") : t("auth.login")}
             </Button>
