@@ -228,13 +228,14 @@ export function LoginPage() {
                 spacing={1.2}
                 alignItems="center"
                 sx={{
-                  minHeight: 82,
-                  px: 1.5,
-                  py: 1.25,
+                  minHeight: 68,
+                  px: 1.35,
+                  py: 0.8,
                   borderRadius: 3,
-                  bgcolor: "rgba(255,255,255,.94)",
-                  border: "1px solid rgba(205,222,241,.95)",
-                  boxShadow: "0 10px 28px rgba(31,77,128,.10)",
+                  bgcolor: "rgba(255,255,255,.68)",
+                  backdropFilter: "blur(10px) saturate(1.08)",
+                  border: "1px solid rgba(196,217,239,.78)",
+                  boxShadow: "0 8px 22px rgba(31,77,128,.08)",
                 }}
               >
                 <Avatar
