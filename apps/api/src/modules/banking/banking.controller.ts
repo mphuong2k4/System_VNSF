@@ -31,7 +31,16 @@ export class BankingController {
     @Headers("if-match") etag: string | undefined,
     @Body() body: unknown,
   ) {
-    return this.service.save(request.auth, studentId, etag, body);
+    const correlationId = String(
+      request.header("x-correlation-id") ?? randomUUID(),
+    );
+    return this.service.save(
+      request.auth,
+      studentId,
+      etag,
+      body,
+      correlationId,
+    );
   }
 
   @Patch("review")

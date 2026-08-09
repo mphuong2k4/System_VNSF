@@ -1,87 +1,68 @@
 # VNSF security review
 
-Review date: 2026-08-08. Verdict: the fixes below remove several directly exploitable implementation weaknesses, but security approval is **blocked** by missing privileged administration/break-glass modules and incomplete adversarial coverage described in the final audit.
+Audit date: 2026-08-09. Verdict: **security approval blocked** by SEC-01 and SEC-02. No directly exploitable Critical/High implementation defect was reproduced in the inspected controls.
 
-## Fixed Critical/High findings
+## Verified controls
 
-### SEC-01 — Client-declared checksum trusted for uploads (fixed)
+- Opaque cookie sessions, CSRF token and Origin checks; session rotation after MFA.
+- Deny-by-default role/school/student scope with 404 concealment.
+- Break-glass requires privileged role, MFA, recent reauthentication, reason, bounded scope and expiry.
+- AES-256-GCM encryption plus separate HMAC indexing; masked bank/identity reads and audited reveal.
+- Parameterized SQL values; fixed server-side dynamic identifiers.
+- Server-generated object keys; private quarantine, bounded size, SHA-256/magic-byte validation, ClamAV and clean-only signed download.
+- Structured logs exclude request bodies/query values; secret-pattern scan found no private key/provider token.
+- Transactional outbox, bounded retry/backoff and durable DLQ evidence.
+- Confirmed expense, received transfer and validated bank-account corrections are restricted to `SUPER_ADMIN`, require reasons, and preserve version/audit evidence.
+- ClamAV INSTREAM waits for a complete verdict before closing; real clean-file and EICAR integration cases pass.
+- Security regression 3/3 and dependency gate with zero Critical/High advisories.
 
-- **Severity:** High
-- **Location:** `apps/api/src/modules/documents/documents.service.ts`, `object-storage.service.ts`, `apps/worker/src/document-scanner.ts`.
-- **Issue:** Completion previously trusted S3 metadata rather than hashing actual bytes; the worker fetched the object before enforcing actual size.
-- **Impact:** A replaced or oversized object could bypass integrity intent and consume worker memory before rejection.
-- **Reproduce:** Upload bytes whose SHA-256 differs from the declared checksum while preserving client metadata.
-- **Fix:** Implemented actual object length and SHA-256 verification before completion and again before scanning; HEAD size is checked before GET. Real MinIO/ClamAV clean and EICAR integration tests pass.
+## Findings
 
-### SEC-02 — MFA verification did not rotate the session (fixed)
-
-- **Severity:** High
-- **Location:** `apps/api/src/modules/identity/identity.service.ts`, `identity.controller.ts`.
-- **Issue:** The pre-MFA session token survived successful MFA/enrollment/recovery.
-- **Impact:** A fixed or stolen pre-auth token could inherit MFA-verified privilege.
-- **Reproduce:** Log in to obtain a pre-MFA cookie, verify MFA, then retry the old cookie.
-- **Fix:** Implemented transactional revocation with reason `MFA_ROTATED`, issuance of a fresh session/CSRF token and secure cookie replacement for all MFA completion paths.
-
-### SEC-03 — No terminal DLQ evidence (fixed)
+### SEC-01 — Exhaustive cross-scope/IDOR matrix and DAST are absent
 
 - **Severity:** High
-- **Location:** `apps/worker/src/main.ts`, `infra/docker/postgres/016_queue_dlq.sql`.
-- **Issue:** Terminal queue/outbox failures were not recorded in an operator-visible durable DLQ.
-- **Impact:** Business events could exhaust retries without durable investigation/replay evidence.
-- **Reproduce:** Force an outbox/worker job to exceed all attempts and inspect the database before migration 016.
-- **Fix:** Added exponential outbox retry, terminal `queue_dead_letters` records, sanitized failure codes, attempts and resolution evidence; failed BullMQ jobs are retained.
+- **Location:** `apps/api/test/security`, `.github/workflows/ci.yml`.
+- **Issue:** Representative controls pass, but all 97 handlers are not exercised across four roles, school/student scopes, states and protected fields; authenticated DAST/fuzzing is absent.
+- **Impact:** An endpoint-specific IDOR, injection or stored-XSS regression may survive CI.
+- **Reproduce:** Compare handler inventory with three dedicated security cases and CI jobs.
+- **Fix:** Add generated policy matrix cases, authenticated ZAP, request-schema fuzzing and malicious upload corpus.
 
-### SEC-04 — Sensitive endpoints lacked distributed rate limiting (fixed)
-
-- **Severity:** High
-- **Location:** `apps/api/src/modules/identity/session.guard.ts`, `identity.service.ts`, migration 016, `main.ts`.
-- **Issue:** Login, reset, reauth, transfer confirmation and exports had no application-level distributed limiter.
-- **Impact:** Credential attacks and expensive-action abuse were easier and horizontally scaled instances would not coordinate limits.
-- **Reproduce:** Repeatedly call a protected endpoint from the same actor/IP; previous code did not reject bursts.
-- **Fix:** Added atomic PostgreSQL window counters, route policies, HMAC-pseudonymized actor/IP keys and trusted-proxy configuration. Regression tests pass.
-
-### SEC-05 — Critical/High vulnerable dependencies (fixed)
-
-- **Severity:** Critical
-- **Location:** workspace package manifests and `pnpm-lock.yaml`.
-- **Issue:** Dependency audit reported 2 Critical and 23 High advisories, including multipart handling, router XSS/DoS and tooling path/TLS issues.
-- **Impact:** Known exploitable defects were present in runtime or build/test dependencies.
-- **Reproduce:** Run the prior lockfile through `pnpm audit --audit-level high`.
-- **Fix:** Upgraded/pinned affected dependencies and safe overrides. Current audit exits 0 at High threshold with 0 Critical/High; 3 Low and 5 Moderate remain for normal maintenance.
-
-### SEC-06 — Static web responses lacked defensive headers (fixed)
+### SEC-02 — Production security operations lack external evidence
 
 - **Severity:** High
-- **Location:** `infra/docker/nginx.conf`.
-- **Issue:** Helmet protected API responses, but Nginx-served SPA responses lacked CSP, anti-framing, MIME sniffing, referrer and feature restrictions.
-- **Impact:** Browser-side injection/clickjacking impact was unnecessarily broad.
-- **Reproduce:** Inspect response headers for `/` from the prior web container.
-- **Fix:** Added a restrictive CSP, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and `Permissions-Policy`. HTTPS/HSTS remains an ingress/provider responsibility.
+- **Location:** Deployment/DR/incident runbooks and release artifacts.
+- **Issue:** Managed secret rotation, WAF/ingress TLS/HSTS, alert routing, image signature verification and provider recovery have not been demonstrated.
+- **Impact:** Secure operation and recovery cannot be approved even if application controls are sound.
+- **Reproduce:** Inspect repository artifacts for provider exercise and Security approval; none are present.
+- **Fix:** Configure the selected platform, sign/pin artifacts, exercise detection/recovery and record Security/SRE approval.
 
-## Unresolved security findings
+### SEC-03 — Dependency maintenance debt remains
 
-### SEC-07 — Privileged administration and break-glass controls absent
+- **Severity:** Medium
+- **Location:** `pnpm-lock.yaml`.
+- **Issue:** Five Moderate and three Low advisories remain.
+- **Impact:** Reachable moderate issues could become exploitable as usage changes.
+- **Reproduce:** Run `pnpm audit`.
+- **Fix:** Review reachability and update compatible dependency chains.
 
-- **Severity:** Critical
-- **Location:** missing runtime modules; schema in migrations 001/003/004.
-- **Issue:** Secure user/scope revocation and controlled emergency access are not implemented.
-- **Impact:** Access governance is incomplete and emergency intervention would bypass required controls.
-- **Reproduce:** Enumerate OpenAPI/controllers for users, assignments and break-glass; no paths exist.
-- **Fix:** Implement A-01/A-02 before security approval.
+### SEC-04 — Semantic API security contract drift is not gated
 
-### SEC-08 — Full cross-scope and DAST coverage absent
+- **Severity:** Medium
+- **Location:** OpenAPI/CI.
+- **Issue:** Syntax validation does not prove implemented security requirements match each operation.
+- **Impact:** A future route may omit documented auth/error/scope behavior.
+- **Reproduce:** Add an undocumented controller handler; Redocly still validates the unchanged file.
+- **Fix:** Add booted-API contract/security conformance tests.
 
-- **Severity:** High
-- **Location:** `apps/api/test/security`, `apps/web/e2e`, CI.
-- **Issue:** Parameterized SQL, generated object keys, React escaping, origin/CSRF checks and deny-by-default policy reduce risk, but every role/resource/scope and OWASP vector is not tested end-to-end.
-- **Impact:** An IDOR, stored-XSS or boundary regression in an untested route may survive CI.
-- **Reproduce:** Compare all controller operations to security cases; only a subset has negative cross-scope/adversarial tests.
-- **Fix:** Add full auth matrix, authenticated ZAP/DAST, payload fuzzing and malicious upload corpus as release gates.
+## OWASP disposition
 
-## Additional observations
-
-- SQL values are parameterized; inspected dynamic identifiers are selected from fixed server-side definitions.
-- Object keys are server-generated, limiting path traversal; no user-controlled outbound URL fetch was found, limiting SSRF exposure.
-- HTTP logs record method/route/status/correlation rather than request bodies; the tracked-source credential pattern scan found no committed private key or token.
-- Protected fields use encryption/HMAC and masked responses; reveal paths require authorization/reauth/audit where implemented.
-- `.env` contains local secrets but is ignored. Production secrets must come from a managed secret store and be rotated before release.
+| Vector            | Current disposition                                                         |
+| ----------------- | --------------------------------------------------------------------------- |
+| CSRF              | Origin + CSRF guard implemented; regression test exists                     |
+| XSS               | React escaping and CSP present; stored-XSS DAST missing                     |
+| SQL injection     | Parameterized values observed; fuzz coverage incomplete                     |
+| SSRF              | No user-controlled outbound URL fetch found                                 |
+| Path traversal    | Server-generated object keys and private prefixes                           |
+| IDOR              | Scope/404 controls implemented; exhaustive matrix missing                   |
+| Sensitive logging | Bodies/query values excluded; redaction keys configured                     |
+| Secrets           | No tracked provider/private-key pattern found; local `.env` remains ignored |

@@ -28,6 +28,18 @@ async function scanOnce(buffer: Buffer) {
       port: config.CLAMAV_PORT,
     });
     let response = "";
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      try {
+        resolve(parseClamResponse(response));
+      } catch (error) {
+        reject(error);
+      } finally {
+        socket.end();
+      }
+    };
     socket.setTimeout(30_000, () =>
       socket.destroy(new Error("CLAMAV_TIMEOUT")),
     );
@@ -40,20 +52,25 @@ async function scanOnce(buffer: Buffer) {
         socket.write(size);
         socket.write(chunk);
       }
-      socket.end(Buffer.alloc(4));
+      socket.write(Buffer.alloc(4));
     });
     socket.on("data", (chunk: Buffer) => {
       response += chunk.toString("utf8");
+      if (
+        response.includes("\0") ||
+        response.includes(" FOUND") ||
+        response.includes(" OK")
+      )
+        finish();
     });
-    socket.on("error", reject);
-    socket.on("close", (hadError) => {
-      if (!hadError) {
-        try {
-          resolve(parseClamResponse(response));
-        } catch (error) {
-          reject(error);
-        }
+    socket.on("error", (error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
       }
+    });
+    socket.on("close", (hadError) => {
+      if (!hadError && !settled) finish();
     });
   });
 }

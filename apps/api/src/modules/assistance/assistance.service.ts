@@ -193,7 +193,10 @@ export class AssistanceService {
     const normalized = action.toUpperCase();
     if (!["SUBMIT", "RETURN", "CONFIRM", "CORRECT"].includes(normalized))
       throw new DomainError("ACTION_NOT_SUPPORTED", 404);
-    if (normalized === "SUBMIT" || normalized === "CORRECT")
+    if (normalized === "CORRECT") {
+      if (!auth.roles.includes("SUPER_ADMIN"))
+        throw new DomainError("RESOURCE_NOT_FOUND", 404);
+    } else if (normalized === "SUBMIT")
       this.assertManagedWrite(auth, student, "expense.write");
     else if (
       !can(toActor(auth), "expense.review", {

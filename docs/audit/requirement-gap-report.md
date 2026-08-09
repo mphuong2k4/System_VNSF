@@ -1,90 +1,76 @@
 # VNSF requirement traceability and gap report
 
-Source set: `VNSF_Dac_ta_He_thong_Quan_ly_Hoc_bong_v5.5_Code_Ready.docx` and `VNSF_Tai_lieu_Xay_dung_He_thong_Website_v1.4_Code_Ready.docx`, compared directly with the repository on 2026-08-08.
+Audit date: 2026-08-09. Sources: Business Specification v5.5 and Website Build Guide v1.4, parsed directly from the supplied DOCX files.
 
-## Traceability summary
+## Traceability
 
-| Requirement domain                             | Runtime implementation                         | Verification                  | Status                                                    |
-| ---------------------------------------------- | ---------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
-| Authentication, session, MFA, recovery, reauth | identity module, migrations 003/004            | unit/security/build           | Implemented; privileged admin lifecycle missing (RG-01).  |
-| User/role/school assignment and revocation     | baseline schema only                           | source/OpenAPI enumeration    | Missing (RG-01).                                          |
-| Break-glass                                    | table + permission only                        | source/OpenAPI enumeration    | Missing (RG-02).                                          |
-| Student/guardian/transfer/duplicate            | students module and UI                         | unit/build                    | Implemented; national identity lifecycle missing (RG-03). |
-| Academic submission/review/snapshot            | academics module/state machine/UI              | unit/build                    | Partial; type/schema rules missing (RG-04).               |
-| Banking/manual transfers                       | banking/transfers modules and UI               | integration                   | Implemented with masking/reveal/idempotency.              |
-| Expenses/support/obligations/thank-you         | assistance/obligations modules and UI          | integration/unit/build        | Implemented.                                              |
-| Documents                                      | document module + scanner worker               | real MinIO/ClamAV integration | Implemented after integrity fix.                          |
-| Notifications/reminders                        | notifications + worker                         | SMTP/DB integration           | Implemented.                                              |
-| Import/export/reporting/dashboard              | reporting + data-job worker                    | integration/build             | Implemented; load SLO evidence missing (RG-06).           |
-| Audit/config/consent/legal hold                | governance/config modules                      | integration/build             | Partial; retention execution missing (RG-05).             |
-| i18n and accessibility                         | vi/en resources, language toggle, keyboard E2E | unit/E2E                      | Partial (RG-07).                                          |
-| Operations/backup/release                      | runbooks, DR script, CI/release workflow       | local drill/build             | Partial (RG-06).                                          |
+| Requirement domain                    | Implementation evidence                       | Verification                  | Status                        |
+| ------------------------------------- | --------------------------------------------- | ----------------------------- | ----------------------------- |
+| AUTH/MFA/session/reauth               | identity module; migrations 003/016           | unit, security, E2E           | Implemented                   |
+| Four roles/user/school administration | administration module; migration 017          | integration                   | Implemented                   |
+| Scope/field/break-glass               | policy, breakglass, student identity          | integration, source review    | Implemented; matrix gap RG-02 |
+| Student/guardian/duplicate/history    | students module; migrations 004/006           | unit/integration              | Implemented                   |
+| Academic submission/review            | academics/state machine; migration 007        | unit/integration              | Implemented                   |
+| Documents/upload/scan                 | documents + scanner; migration 008            | real MinIO/ClamAV integration | Implemented                   |
+| Banking/manual transfer               | banking/transfers; migrations 009/010         | unit/integration              | Implemented                   |
+| Expense/support                       | assistance; migration 011                     | unit/integration              | Implemented                   |
+| Extension/thank-you                   | obligations; migration 012                    | integration                   | Implemented                   |
+| Notification/reminder                 | notifications + worker; migration 013         | integration                   | Implemented                   |
+| Dashboard/import/export               | reporting + data jobs; migration 014          | integration                   | Implemented; load gap RG-04   |
+| Audit/consent/legal hold              | governance; migration 015                     | integration                   | Implemented                   |
+| Retention lifecycle                   | permanent-retention owner rule; version/audit | integration/source review     | Implemented                   |
+| i18n                                  | vi-VN/en-US catalogs and preference API       | unit/E2E                      | Implemented                   |
+| Accessibility                         | semantic navigation, skip link, responsive UI | E2E                           | Partial; RG-03                |
+| Queue/DLQ/observability               | worker, metrics, migration 016                | unit/integration              | Implemented                   |
+| Backup/release/operations             | runbooks, DR and release workflow             | local drill/build             | Partial; RG-05                |
 
-## Requirement gaps
+## Gaps
 
-### RG-01 — Administrative identity lifecycle absent
+### RG-01 — Retention execution missing
 
-- **Severity:** Critical
-- **Location:** Missing from `apps/api/src/modules`, `apps/web/src/features` and `packages/contracts/openapi.yaml`; underlying tables in migrations 001/004.
-- **Issue:** Required user CRUD, role/permission and school-scope assignment, lock/unlock and access-change session revocation are not implemented.
-- **Impact:** The MVP cannot be securely administered or accepted against the USR requirements.
-- **Reproduce:** Enumerate registered controllers/OpenAPI; no user administration paths exist.
-- **Fix:** Implement versioned privileged APIs/UI, transactional session revocation, audit/outbox and full authorization-matrix tests.
+- **Severity:** Low (closed by business decision)
+- **Location:** Governance retention policy and confirmed-data mutation services.
+- **Issue:** The previous gap assumed a purge/anonymize outcome; the owner explicitly selected permanent retention with no deletion after confirmation.
+- **Impact:** Purge execution is intentionally out of scope and would conflict with the selected policy.
+- **Reproduce:** Review the owner decision and confirmed-state correction integration tests.
+- **Fix:** Closed by permanent retention and `SUPER_ADMIN`-only, reasoned, version-preserving correction. Preserve formal regulatory approval as release evidence.
 
-### RG-02 — Controlled emergency access absent
-
-- **Severity:** Critical
-- **Location:** `infra/docker/postgres/003_identity.sql`, `apps/api/src/modules/authorization/policy.ts`; no runtime module.
-- **Issue:** Break-glass requirements are represented only by storage and a permission label.
-- **Impact:** Emergency operations cannot satisfy reauth, MFA, reason, expiry and enhanced audit requirements.
-- **Reproduce:** Search runtime/OpenAPI for break-glass endpoints; none exist.
-- **Fix:** Implement the complete time-boxed workflow and security tests described in A-02.
-
-### RG-03 — National identity field workflow absent
-
-- **Severity:** Critical
-- **Location:** `infra/docker/postgres/002_mvp.sql`; no students runtime path.
-- **Issue:** Required encrypted identity number handling and field-level permission are not exposed by a controlled service.
-- **Impact:** Student records are incomplete or operators may use unsafe workarounds.
-- **Reproduce:** Search non-migration code for `student_identity`; there are no matches.
-- **Fix:** Add encrypted/HMAC writes, duplicate matching, masked/reveal reads, reasoned audit and scope tests.
-
-### RG-04 — Academic business validation incomplete
+### RG-02 — Requirement-level authorization matrix is incomplete
 
 - **Severity:** High
-- **Location:** `apps/api/src/modules/academics/academics.service.ts:22-31`.
-- **Issue:** Arbitrary JSON substitutes for specified academic/transcript/GPA field and scale validation.
-- **Impact:** Invalid academic data can be approved and reported.
-- **Reproduce:** Store out-of-range GPA or unknown scale in draft payload; it passes schema validation.
-- **Fix:** Introduce versioned type-specific academic schemas and normalized scale rules.
+- **Location:** Security/integration tests.
+- **Issue:** Not every role, scope, resource, state and protected field has allow/deny/404 coverage.
+- **Impact:** The “zero cross-scope access” acceptance criterion is not fully evidenced.
+- **Reproduce:** Map 97 handlers to negative authorization cases; many have no dedicated case.
+- **Fix:** Generate and enforce a complete matrix from OpenAPI/permission catalog.
 
-### RG-05 — Retention stops after approval preview
-
-- **Severity:** Critical
-- **Location:** governance service/controller and OpenAPI retention paths.
-- **Issue:** No approved execution step performs legal-hold-aware anonymization/purge.
-- **Impact:** Mandatory retention outcomes cannot be fulfilled.
-- **Reproduce:** Complete a dry-run approval; no executable transition exists.
-- **Fix:** Obtain Legal decisions, then implement dual-control execution and immutable evidence.
-
-### RG-06 — Production NFR/DR acceptance evidence incomplete
+### RG-03 — Full WCAG acceptance missing
 
 - **Severity:** High
-- **Location:** `tests/performance/baseline.mjs`, `docs/implementation/disaster-recovery.md`, release workflow.
-- **Issue:** Only liveness and a local logical restore are evidenced; approved workload SLO and provider recovery exercises are absent.
-- **Impact:** Capacity and recoverability are unknown at production scale.
-- **Reproduce:** Review baseline and DR exclusions; business workflows/provider restores are not tested.
-- **Fix:** Approve NFR/RPO/RTO, execute representative load and provider restore/cutover tests, retain evidence as release artifacts.
+- **Location:** Web E2E and UAT evidence.
+- **Issue:** Automated/manual coverage does not satisfy all Guide 17.8 checks.
+- **Impact:** Accessibility Definition of Done is unmet.
+- **Reproduce:** Compare existing two accessibility cases with 320px, zoom 200%, text expansion and screen-reader requirements.
+- **Fix:** Add axe route coverage plus manual assistive-technology sign-off.
 
-### RG-07 — Language and accessibility acceptance incomplete
+### RG-04 — NFR workload acceptance missing
 
 - **Severity:** High
-- **Location:** `apps/web/src/i18n.ts`, `apps/web/src/main.tsx`, `apps/web/e2e`.
-- **Issue:** Both catalogs exist, but preference is not persisted and WCAG 2.1 AA coverage is not complete.
-- **Impact:** Language behavior is inconsistent and users of assistive technology may encounter undiscovered blockers.
-- **Reproduce:** Toggle language across a new session; inspect E2E coverage against all WCAG routes/criteria.
-- **Fix:** Persist user locale and add automated axe plus manual assistive-technology acceptance evidence.
+- **Location:** Performance tests.
+- **Issue:** Only liveness is measured; 20 RPS, 100 concurrent and worker workloads are not evidenced.
+- **Impact:** NFR-PERF acceptance is unmet.
+- **Reproduce:** Inspect `tests/performance/smoke.mjs`.
+- **Fix:** Run representative k6 workflows against production-like data and retain results.
 
-## Traceability decision
+### RG-05 — Production DR/operations acceptance missing
 
-The requirement set is **not fully traced to passing implementation**. Tables or permission constants are not counted as completed features. The unresolved Critical/High gaps are release blocking.
+- **Severity:** High
+- **Location:** Backup/restore and deployment evidence.
+- **Issue:** Provider PITR/object restore, alerts and approved RPO/RTO are not demonstrated.
+- **Impact:** Operational Definition of Done is unmet.
+- **Reproduce:** Compare provider acceptance requirements with the local logical restore artifact.
+- **Fix:** Execute and approve a timed provider recovery/cutover exercise.
+
+## Traceability conclusion
+
+The major MVP domains are represented by usable API/UI and tests. The prior Critical gaps for administration, break-glass, national identity and retention are closed in current source. Confirmed user data follows a no-delete/no-anonymize policy and correction is restricted to `SUPER_ADMIN` with reason and preserved history. Authorization, WCAG, workload and provider-recovery acceptance evidence remains High.

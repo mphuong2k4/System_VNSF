@@ -30,6 +30,10 @@ suite("education expenses and support persistence", () => {
     schoolIds: [],
     mfaVerified: true,
   };
+  const superAdmin: AuthContext = {
+    ...reviewer,
+    roles: ["SUPER_ADMIN"],
+  };
   const senior: AuthContext = {
     sessionId: randomUUID(),
     userId: ids.studentUser,
@@ -136,6 +140,29 @@ suite("education expenses and support persistence", () => {
         { vnd_per_year: "2.00" },
       ),
     ).rejects.toThrow("EXPENSE_CORRECTION_REQUIRED");
+    await expect(
+      service.expenseAction(
+        reviewer,
+        ids.senior,
+        "2025-2026",
+        "correct",
+        String(expense.version),
+        "expense-correct-manager-001",
+        { reason: "Correct confirmed expense evidence" },
+        randomUUID(),
+      ),
+    ).rejects.toThrow("RESOURCE_NOT_FOUND");
+    expense = await service.expenseAction(
+      superAdmin,
+      ids.senior,
+      "2025-2026",
+      "correct",
+      String(expense.version),
+      "expense-correct-admin-0001",
+      { reason: "Correct confirmed expense evidence" },
+      randomUUID(),
+    );
+    expect(expense.status).toBe("DRAFT");
     const versions = await db.query<{ action: string }>(
       `SELECT action FROM education_expense_versions WHERE expense_id=$1 ORDER BY version_no`,
       [expense.id],
@@ -144,6 +171,7 @@ suite("education expenses and support persistence", () => {
       "CREATED",
       "SUBMITTED",
       "CONFIRMED",
+      "CORRECTED",
     ]);
   });
   it("records, versions, updates and archives support occurrences", async () => {

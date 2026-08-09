@@ -172,7 +172,6 @@ suite("privileged access administration", () => {
       preferred_locale: "en-US",
       roles: ["SUPER_ADMIN"],
       student_id: null,
-      mfa_enabled: false,
     });
   });
 });

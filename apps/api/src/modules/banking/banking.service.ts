@@ -21,6 +21,7 @@ const accountSchema = z
       .trim()
       .toUpperCase()
       .regex(/^[A-Z0-9_-]{2,20}$/),
+    correction_reason: z.string().trim().min(10).max(500).optional(),
   })
   .strict();
 const reviewSchema = z
@@ -75,6 +76,7 @@ export class BankingService {
     studentId: string,
     etag: string | undefined,
     input: unknown,
+    correlationId: string,
   ) {
     studentId = z.string().uuid().parse(studentId);
     const expected = parseEtag(etag);
@@ -84,7 +86,11 @@ export class BankingService {
       [studentId],
     );
     const schoolId = student.rows[0]?.current_school_id;
-    if (!schoolId || !can(toActor(auth), "bank.self", { studentId, schoolId }))
+    if (
+      !schoolId ||
+      (!auth.roles.includes("SUPER_ADMIN") &&
+        !can(toActor(auth), "bank.self", { studentId, schoolId }))
+    )
       throw new DomainError("RESOURCE_NOT_FOUND", 404);
     const normalizedNumber = normalizeAccountNumber(value.account_number);
     let result;
@@ -100,6 +106,12 @@ export class BankingService {
           (active && active.version !== expected)
         )
           throw new DomainError("VERSION_CONFLICT", 412);
+        if (active?.status === "VALIDATED") {
+          if (!auth.roles.includes("SUPER_ADMIN"))
+            throw new DomainError("RESOURCE_NOT_FOUND", 404);
+          if (!value.correction_reason)
+            throw new DomainError("REASON_REQUIRED", 422);
+        }
         if (active)
           await client.query(
             `UPDATE student_bank_accounts SET effective_to=now(),updated_at=now() WHERE id=$1`,
@@ -124,7 +136,23 @@ export class BankingService {
         throw new DomainError("VERSION_CONFLICT", 412);
       throw error;
     }
-    return this.masked(result.rows[0]!);
+    const saved = result.rows[0]!;
+    if (value.correction_reason)
+      await this.db.query(
+        `INSERT INTO audit_events(actor_id,action,resource_type,resource_id,result,after_redacted,correlation_id)
+         VALUES($1,'bank.correct','student_bank_account',$2,'SUCCESS',$3,$4)`,
+        [
+          auth.userId,
+          saved.id,
+          JSON.stringify({
+            student_id: studentId,
+            reason: value.correction_reason,
+            replacement_version: saved.version,
+          }),
+          correlationId,
+        ],
+      );
+    return this.masked(saved);
   }
 
   async review(

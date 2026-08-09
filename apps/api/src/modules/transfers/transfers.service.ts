@@ -223,7 +223,10 @@ export class TransfersService {
     this.requireKey(key);
     const expected = parseEtag(etag);
     const value = correctionSchema.parse(input);
-    if (!can(toActor(auth), "transfer.write", {}))
+    if (
+      !auth.roles.includes("SUPER_ADMIN") ||
+      !can(toActor(auth), "transfer.write", {})
+    )
       throw new DomainError("RESOURCE_NOT_FOUND", 404);
     return this.db.transaction(async (client) => {
       const cached = await this.cached<TransferRow>(

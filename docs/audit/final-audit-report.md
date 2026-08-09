@@ -1,148 +1,149 @@
 # VNSF final engineering audit
 
-> Release-candidate verification update (2026-08-09): remediation now includes migration 017 access administration, controlled break-glass, encrypted student identity, structured academic validation, locale persistence, a responsive VNSF UI, and private-route/session-expiry enforcement. Current evidence is clean migrations 001-017, API integration 14/14, worker integration 4/4, security 3/3, browser E2E 5/5, workspace build/lint/typecheck/unit gates, dependency audit with no Critical/High advisory, liveness p95 26.97 ms, and an isolated 55-table backup/restore drill. The historical findings below remain point-in-time evidence; retention execution and provider-level production acceptance still prevent a production-ready declaration.
+Audit date: 2026-08-09. Sources inspected directly: Business Specification v5.5 (2,903 paragraphs), Website Build Guide v1.4 (1,420 paragraphs), repository at `0abcc10`, migrations 001-017, OpenAPI, tests and the running Docker stack.
 
-> Post-audit remediation update (2026-08-08): findings A-01, A-02, A-03, A-05 and A-10 were implemented in migration 017 and the administration, break-glass, students, identity, academics and web modules. Clean-database API integration now covers user access revocation, scoped emergency access, encrypted identity disclosure and locale persistence. A-04 remains Critical because retention execution requires approved Legal rules; A-06 through A-09 remain release-readiness work. The original findings below are preserved as point-in-time audit evidence.
+## Decision
 
-Date: 2026-08-08 (Asia/Ho_Chi_Minh)  
-Scope: repository, both supplied requirements documents, clean test database, API, worker, web build, Docker test dependencies and CI/release configuration.  
-Verdict: **NOT PRODUCTION-READY**. Four Critical and six High requirement/readiness gaps remain. Green builds do not override these gaps.
+**NO-GO for production.** The implemented MVP is suitable for controlled development/UAT, but four High findings remain. The former retention blocker is closed by the owner's binding rule: confirmed user data is retained indefinitely, is never purged/anonymized/deleted, and may only be corrected by `SUPER_ADMIN` through versioned, audited workflows.
 
-## Method and runtime evidence
+## Verification summary
 
-The audit extracted the Word document XML and traced the MVP and non-functional clauses to controllers, services, migrations, UI routes and tests. It did not rely on earlier completion reports. A clean Docker test stack was created with PostgreSQL 16, Redis 7, MinIO, Mailpit and ClamAV. Migrations `001` through `016` applied in order. A native Windows PostgreSQL process was found occupying the former test port `55432`; the test stack and CI were moved to `55433` so tests could not silently hit the wrong database.
+| Area                             | Direct evidence                                                                               | Result                                     |
+| -------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Requirements/modules             | Both DOCX files, traceability, 97 controller handlers, web routes                             | Core MVP modules implemented               |
+| OpenAPI                          | Redocly validation/bundle; 76 documented paths compared with controllers                      | Valid; no obvious endpoint-domain omission |
+| Database                         | Empty PostgreSQL test volume, migrations 001-017                                              | Pass                                       |
+| RBAC/scope/field permissions     | policy/service inspection; access, banking, governance and reporting integration              | Implemented; exhaustive matrix absent      |
+| State/idempotency/locking/outbox | services, constraints/triggers and integration tests                                          | Implemented in critical workflows          |
+| Queue/retry/DLQ                  | worker source, migration 016, worker integration                                              | Implemented                                |
+| Encryption/masking/upload        | crypto/student/banking/document services; MinIO/ClamAV integration                            | Implemented                                |
+| Web threats/logging/secrets      | guard, error/observability code, parameterized SQL/object-key inspection, secret-pattern scan | No direct Critical/High defect found       |
+| Unit                             | API 27, worker 7, web 2                                                                       | Pass                                       |
+| Integration                      | API 14/14, worker 4/4                                                                         | Pass after AUD-FIX-01                      |
+| E2E                              | Playwright Chromium 6/6                                                                       | Pass                                       |
+| Build                            | config/contracts/UI/API/web/worker                                                            | Pass                                       |
+| Performance                      | 100 liveness requests, concurrency 10                                                         | 0 failures; p95 28.94 ms                   |
+| Backup/restore                   | isolated logical restore                                                                      | 55 tables and critical counts matched      |
+| Dependencies                     | `pnpm audit --audit-level high`                                                               | 0 Critical/High; 5 Moderate, 3 Low         |
 
-Observed results after fixes:
+## Coverage of the 25 requested areas
 
-- OpenAPI lint: pass.
-- lint: pass.
-- typecheck: pass.
-- production build: API, worker and web pass; Vite transformed 1,063 modules.
-- clean migration: 16/16 pass.
-- API integration: 7 files, 11/11 tests pass.
-- worker integration: 3 files, 4/4 tests pass, including clean/EICAR object scanning.
-- security regression: 1 file, 3/3 tests pass.
-- browser E2E: 4/4 pass on the lockfile-matched Chromium build.
-- dependency audit at High threshold: pass; 0 Critical and 0 High advisories, with 3 Low and 5 Moderate remaining.
-- The liveness baseline was 100 requests with p95 31.53 ms; it is not broad enough for production acceptance (A-07/A-08).
-
-## Coverage of requested audit areas
-
-|     # | Area                                      | Result                                    | Evidence / gap                                                                                                                                                                                               |
-| ----: | ----------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-|   1-3 | Requirements, traceability, MVP modules   | Fail                                      | Core workflows exist, but user administration, break-glass, identity-number lifecycle and retention execution are absent (A-01..A-04).                                                                       |
-|     4 | OpenAPI vs implementation                 | Partial                                   | OpenAPI validates and sampled routes match controllers; no generated-client or automated route/schema drift gate (A-06).                                                                                     |
-|     5 | Schema and migrations                     | Pass with caveat                          | Clean `001-016` succeeds; migration checksum enforcement exists. Business gaps remain despite placeholder tables.                                                                                            |
-|     6 | RBAC, scope, field permissions            | Partial                                   | Deny-by-default policy, server-derived scope, masking and reveal checks exist; missing admin/break-glass lifecycle prevents full matrix compliance.                                                          |
-|     7 | State machines                            | Partial                                   | Academic, assistance, transfer, obligation and document transitions are guarded; generic academic payload permits semantically invalid submissions (A-05).                                                   |
-|     8 | Idempotency                               | Pass for implemented sensitive flows      | Academic submit, assistance decisions, transfers and data jobs store actor/key/request hash/response.                                                                                                        |
-|     9 | Optimistic locking                        | Pass for implemented versioned aggregates | `If-Match`/version predicates and conflict errors are present on relevant update paths.                                                                                                                      |
-|    10 | Transactional outbox                      | Pass                                      | State changes and outbox inserts share DB transactions; dispatcher was hardened with terminal evidence.                                                                                                      |
-|    11 | Retry and DLQ                             | Pass after fix                            | Exponential retry plus `queue_dead_letters` migration and terminal failure recording added.                                                                                                                  |
-|    12 | Encryption and masking                    | Pass for implemented fields               | AES-GCM/HMAC-backed protected fields, masked reads and audited reveal paths exist. Identity-number API itself is missing (A-03).                                                                             |
-|    13 | Upload security                           | Pass after fix                            | Private quarantine, declared size, actual byte count, actual SHA-256, MIME sniffing, ClamAV and clean promotion are enforced.                                                                                |
-| 14-17 | Logs, secrets, IDOR and web/input attacks | Partial/pass                              | Structured logs avoid bodies; tracked-source pattern scan found no credential; parameterized SQL and generated object keys predominate; CSP/security headers added. Full adversarial DAST is missing (A-08). |
-|    18 | Unit/integration/E2E                      | Partial                                   | Current suites pass, but identity/RBAC matrix, break-glass and full browser acceptance cannot be covered while modules are absent.                                                                           |
-|    19 | Builds                                    | Pass                                      | API, web and worker production builds pass.                                                                                                                                                                  |
-|    20 | Clean Compose                             | Partial                                   | Clean dependency stack and migrations pass; production-like full stack still uses floating third-party tags and lacks immutable artifact verification (A-09).                                                |
-|    21 | vi-VN/en-US                               | Partial                                   | Both UI catalogs and notification locale selection exist; user preference mutation/persistence is absent (A-10).                                                                                             |
-|    22 | Accessibility                             | Partial                                   | Semantic controls and keyboard E2E checks exist; no complete WCAG 2.1 AA audit (A-08).                                                                                                                       |
-|    23 | Performance                               | Fail                                      | Only liveness smoke baseline; no authenticated workflow, export/import or concurrency thresholds (A-07).                                                                                                     |
-|    24 | Backup/restore docs                       | Partial                                   | Local logical restore drill and runbook exist; provider PITR/object restore and approved RPO/RTO evidence are pending (A-09).                                                                                |
-|    25 | Production readiness                      | Fail                                      | Unresolved Critical/High findings and business/SRE approvals remain.                                                                                                                                         |
+1. Both requirement documents were parsed directly and compared with code.
+2. Requirement traceability was refreshed in `requirement-gap-report.md`.
+3. Identity, administration, student, academic, document, banking, transfer, assistance, obligation, notification, reporting, governance and configuration modules exist.
+4. OpenAPI validates and covers the implemented endpoint domains; automated semantic controller drift detection is absent (AUD-05).
+5. A clean database applied migrations 001-017.
+6. RBAC, school/student scope, masked identity/bank fields and break-glass exist; exhaustive negative coverage is absent (AUD-02).
+7. Submission, expense, transfer, extension and thank-you state transitions are guarded.
+8. Actor-bound idempotency records/unique constraints protect submission, transfer and data jobs.
+9. Version/If-Match checks protect versioned mutations.
+10. Business mutations emit transactional `outbox_events`.
+11. Retry/backoff and durable `queue_dead_letters` exist.
+12. AES-GCM/HMAC, masking, reauthentication and audited reveal exist.
+13. Private quarantine, size/hash/magic-byte checks, ClamAV and clean-only download exist.
+14. Logs exclude bodies/query values and redact sensitive keys.
+15. Tracked-source key/token scan found no private key or provider token; dependency examples remain test-only.
+16. Deny-by-default scope and 404 concealment exist; complete IDOR matrix is missing (AUD-02).
+17. Origin/CSRF, React escaping, parameterized SQL, server-generated object keys and no user URL fetch reduce OWASP risk; DAST/fuzz evidence is missing (AUD-02).
+18. Unit/integration/E2E results are listed above.
+19. Frontend/backend/worker production build passes.
+20. Test Compose was recreated from empty volumes; the live demo volume was intentionally preserved.
+21. vi-VN/en-US catalogs and persisted locale exist.
+22. Landmarks, skip-link and mobile overflow E2E exist; complete WCAG evidence is missing (AUD-03).
+23. Liveness baseline passes; representative workflows are unmeasured (AUD-04).
+24. Backup/restore runbooks and logical drill exist; provider recovery is unproven (AUD-06).
+25. Production readiness is NO-GO while High findings remain.
 
 ## Findings
 
-### A-01 — Missing user, role and scope-assignment administration
+### AUD-01 — Retention execution is not implemented
 
-- **Severity:** Critical
-- **Location:** `apps/api/src/app.module.ts`, `apps/api/src/modules`, `apps/web/src/features`, `packages/contracts/openapi.yaml`; schema only in `infra/docker/postgres/001_baseline.sql` and `004_authorization.sql`.
-- **Issue:** No production API/UI/service implements user CRUD, activation/lock/unlock, role assignment, school assignment or immediate access revocation required by the Identity/USR MVP.
-- **Impact:** Administrators cannot safely provision or revoke operators. RBAC data can only be manipulated out of band, making access governance and acceptance testing incomplete.
-- **Reproduce:** Enumerate Nest controllers or OpenAPI paths and search for `/users`, role assignment, school assignment, lock or unlock operations; none are registered.
-- **Fix:** Implement versioned user/role/scope admin APIs and UI, require MFA/reauth for privileged mutations, revoke active sessions transactionally on access changes, emit audit/outbox events and add the documented authorization matrix tests.
+- **Severity:** Low (closed by business decision)
+- **Location:** Governance retention policy and confirmed-data mutation services.
+- **Issue:** The earlier audit assumed purge/anonymize was required. The owner has now explicitly required permanent retention and prohibited deletion of confirmed user data.
+- **Impact:** No purge executor is required; implementing one would violate the approved business rule.
+- **Reproduce:** Review the recorded owner decision and verify there is no runtime physical-delete path for confirmed user records.
+- **Fix:** Closed: retain confirmed data indefinitely; allow only `SUPER_ADMIN` correction with mandatory reason, version history and immutable audit evidence. Record regulatory approval before production cutover.
 
-### A-02 — Break-glass is schema-only
-
-- **Severity:** Critical
-- **Location:** `infra/docker/postgres/003_identity.sql:51`, `apps/api/src/modules/authorization/policy.ts:23`; no controller/service/UI/OpenAPI path.
-- **Issue:** A table and permission string exist, but there is no reauthentication + MFA + reason + expiry workflow, elevated session enforcement, termination or special audit trail.
-- **Impact:** Emergency access cannot be used through a controlled path; direct database intervention would be unaudited and unsafe.
-- **Reproduce:** Search source and OpenAPI for `break_glass`/`breakglass`; only migration and permission declaration are returned.
-- **Fix:** Add a short-lived, separately authenticated break-glass API and UI, server-side expiry/scope limits, reason validation, prominent audit/outbox events, notification and explicit termination.
-
-### A-03 — Student national-identity lifecycle is schema-only
-
-- **Severity:** Critical
-- **Location:** `infra/docker/postgres/002_mvp.sql:6`; no students service/controller/OpenAPI/UI implementation.
-- **Issue:** `student_identity` has encrypted/HMAC columns, but no authorized create/update, duplicate match, masked display or audited reveal operation exists.
-- **Impact:** A mandatory student-profile field cannot be managed; operators may store it in an unsafe free-text field or outside the system.
-- **Reproduce:** Search for `student_identity` outside migrations; no runtime implementation is found.
-- **Fix:** Add encrypted write and HMAC duplicate lookup, field-level masked reads, reauthenticated reveal with reason, audit events and cross-scope tests.
-
-### A-04 — Retention execution is intentionally absent
-
-- **Severity:** Critical
-- **Location:** `apps/api/src/modules/governance/governance.service.ts:100-223`, OpenAPI `/retention/*`.
-- **Issue:** The system can create policy versions, preview and approve dry runs, but has no legal-hold-aware anonymize/purge executor or immutable execution evidence.
-- **Impact:** Regulatory deletion/anonymization cannot be completed, so production retention obligations cannot be met.
-- **Reproduce:** Approve a retention dry run; there is no execute endpoint/job and records remain unchanged.
-- **Fix:** After Legal approves category rules, implement dual-controlled execution, legal-hold exclusions, bounded batches, outbox notifications, terminal immutable evidence and restore-safe tests. This needs a business/legal decision and was not guessed during audit.
-
-### A-05 — Academic payload lacks domain schema and scale validation
+### AUD-02 — Exhaustive authorization and adversarial coverage is absent
 
 - **Severity:** High
-- **Location:** `apps/api/src/modules/academics/academics.service.ts:22-31`.
-- **Issue:** Draft data is an arbitrary JSON record capped only by byte size; type-specific transcript/GPA/score scale and required-subject rules are not enforced.
-- **Impact:** Semantically invalid submissions can enter review and corrupt scholarship decisions/reporting.
-- **Reproduce:** Save `{ "payload": { "gpa": 999, "scale": "unknown" } }`; the generic Zod schema accepts it.
-- **Fix:** Define versioned schemas per submission type/academic period, normalize scales, validate required fields and persist schema version with migration/backward compatibility.
+- **Location:** `apps/api/test/security`, `apps/api/test/integration`, CI workflow.
+- **Issue:** Existing tests cover representative scope controls, not every role × endpoint × state × field, authenticated DAST, fuzz payload or malicious upload corpus.
+- **Impact:** An untested IDOR, stored-XSS or boundary regression may pass CI.
+- **Reproduce:** Compare 97 handlers with three dedicated security tests and the integration inventory.
+- **Fix:** Generate a deny/allow matrix from OpenAPI, add cross-school/student negatives per operation, authenticated ZAP/DAST, schema fuzzing and a malicious-file corpus as release gates.
 
-### A-06 — OpenAPI drift is not mechanically prevented
-
-- **Severity:** High
-- **Location:** `packages/contracts/openapi.yaml`, `apps/web/src/lib/api.ts`, `.github/workflows/ci.yml`.
-- **Issue:** The document lints, but controller parity and request/response compatibility are not tested and the web client is hand-written rather than generated/validated.
-- **Impact:** A controller or response can change while CI stays green, breaking integrations and UI at runtime.
-- **Reproduce:** Add a controller route without editing OpenAPI; current lint/build succeeds.
-- **Fix:** Generate typed server/client contracts or add an application bootstrap parity test plus schema-based response tests, and fail CI on drift.
-
-### A-07 — Performance evidence is not representative
+### AUD-03 — WCAG 2.1 AA acceptance evidence is incomplete
 
 - **Severity:** High
-- **Location:** `tests/performance/baseline.mjs`, `package.json` performance script.
-- **Issue:** The baseline measures only liveness; it does not exercise authenticated lists, scoped dashboards, submission, imports/exports, object handling or concurrency.
-- **Impact:** Query, memory and queue bottlenecks may appear only under real load after release.
-- **Reproduce:** Inspect the performance script; requests target the liveness endpoint and no business SLO thresholds are asserted.
-- **Fix:** Agree NFR targets and add staged k6 scenarios with production-like data, concurrency, DB query monitoring, worker backlog and fail thresholds.
+- **Location:** `apps/web/e2e/accessibility-responsive.spec.ts`, all authenticated routes.
+- **Issue:** Keyboard landmarks and mobile overflow are tested, but axe coverage, 200% zoom, contrast, screen reader and every route are not evidenced.
+- **Impact:** Blocking accessibility defects can remain undiscovered.
+- **Reproduce:** Compare the two accessibility-responsive cases with Guide v1.4 section 17.8 and all routes.
+- **Fix:** Add axe per route/role, zoom/text-expansion tests and retain manual NVDA/VoiceOver acceptance evidence.
 
-### A-08 — Security and WCAG acceptance breadth is incomplete
-
-- **Severity:** High
-- **Location:** `apps/api/test/security`, `apps/web/e2e`, `.github/workflows/ci.yml`.
-- **Issue:** Regression and keyboard tests cover a small subset; no complete RBAC/IDOR matrix, authenticated DAST, axe/contrast/screen-reader suite or upload fuzz corpus is enforced.
-- **Impact:** Cross-role authorization and accessibility regressions may evade CI.
-- **Reproduce:** List security/E2E tests and compare them with all roles, permissions, scopes and WCAG 2.1 AA criteria; many cells have no test.
-- **Fix:** Add role×scope×resource integration matrices, OWASP DAST against staging, malicious upload corpus, axe-core per route, manual screen-reader evidence and release gates.
-
-### A-09 — Provider disaster recovery and immutable deployment evidence are pending
+### AUD-04 — Performance evidence does not represent the specified workload
 
 - **Severity:** High
-- **Location:** `docs/implementation/disaster-recovery.md`, `docker-compose.staging.yml`, `.github/workflows/release.yml`.
-- **Issue:** The local logical restore is useful, but provider PITR, object-version restore, cross-account copies, measured approved RPO/RTO and immutable image/signature evidence are not demonstrated.
-- **Impact:** Recovery time/data loss and deployed artifact provenance are unknown in a real outage.
-- **Reproduce:** Run the local drill and inspect its exclusions; it explicitly does not prove provider snapshot, object restore, DNS or secret recovery.
-- **Fix:** Select the production provider, pin images by digest, sign/SBOM artifacts, configure PITR/object versioning, perform a staging restore/cutover exercise and record approvals.
+- **Location:** `tests/performance/smoke.mjs`, `tests/performance/smoke.js`.
+- **Issue:** The passing Node baseline measures only `/health/live`, not dashboard, list, upload, export/worker or the 20 RPS/100-concurrent requirement.
+- **Impact:** Capacity, database contention and queue latency are unknown.
+- **Reproduce:** Inspect the smoke target and compare it with v5.5 NFR-PERF and Guide v1.4 section 11.
+- **Fix:** Agree thresholds, seed representative volumes, run k6 business scenarios at sustained/burst load and store latency/error/queue evidence in CI artifacts.
 
-### A-10 — Locale preference cannot be managed end-to-end
+### AUD-05 — OpenAPI/controller drift is not semantically enforced
+
+- **Severity:** Medium
+- **Location:** `.github/workflows/ci.yml`, `packages/contracts/openapi.yaml`.
+- **Issue:** Redocly validates syntax, but CI does not compare Nest routes/request/response behavior to OpenAPI.
+- **Impact:** A future route or schema change may silently drift from the contract.
+- **Reproduce:** Add a controller route without editing OpenAPI; current contract validation still passes.
+- **Fix:** Add generated route/schema conformance or contract tests against a booted API.
+
+### AUD-06 — Provider production recovery and operations are unproven
 
 - **Severity:** High
-- **Location:** `infra/docker/postgres/001_baseline.sql:7`, `apps/web/src/main.tsx:110-115`, identity/user APIs.
-- **Issue:** Users can toggle the current UI and notifications read `preferred_locale`, but there is no authenticated API that persists a preference.
-- **Impact:** Language resets across devices/sessions and notification language cannot be self-managed reliably.
-- **Reproduce:** Toggle language, start a new browser/session, and inspect the user row; no request updates `preferred_locale`.
-- **Fix:** Add an authenticated profile preference endpoint with enum validation/audit, hydrate i18n from the user profile and add vi-VN/en-US persistence tests.
+- **Location:** `docs/runbooks/backup-restore.md`, staging/release configuration.
+- **Issue:** Local logical restore passes, but provider PITR, object-version restore, approved RPO/RTO, alert routing and production cutover evidence do not exist in the repository.
+- **Impact:** Recovery time/data loss and incident response cannot be assured.
+- **Reproduce:** Review restore artifacts: only local PostgreSQL logical restore has measured evidence.
+- **Fix:** Select the production provider, configure managed backups/object versioning/alerts, run a timed database+object restore and cutover, and obtain SRE approval.
 
-## Conclusion
+### AUD-07 — Moderate/Low dependency advisories remain
 
-The implemented subset is materially healthier after this audit, but the repository is not a complete MVP and is not production-ready. A release must remain blocked until all Critical findings and the High release gates above are closed or formally re-scoped and accepted by the authorized business, Legal, Security and SRE owners.
+- **Severity:** Medium
+- **Location:** `pnpm-lock.yaml` dependency graph.
+- **Issue:** Audit reports five Moderate and three Low advisories.
+- **Impact:** No current Critical/High gate failure, but maintenance risk remains.
+- **Reproduce:** Run `pnpm audit --audit-level high` and inspect the full advisory list.
+- **Fix:** Triage reachability, upgrade when compatible and keep scheduled dependency scanning.
+
+## Remediation performed during this audit
+
+### AUD-FIX-02 — Confirmed user data immutability and privileged correction
+
+- **Severity:** High (fixed)
+- **Location:** assistance, transfers and banking services plus their integration tests.
+- **Issue:** Program managers or students could initiate replacement/correction after expense confirmation, transfer receipt or bank-account validation.
+- **Impact:** Confirmed user evidence could be changed by a role below system administrator.
+- **Reproduce:** Attempt expense `CORRECT` as `PROGRAM_MANAGER`, correct a received transfer as `PROGRAM_MANAGER`, or replace a validated bank account as `STUDENT`.
+- **Fix:** These operations now return concealed 404 unless the actor is `SUPER_ADMIN`; correction reason is mandatory, old records remain versioned, and bank correction emits an immutable audit event.
+
+### AUD-FIX-01 — Integration test coupled locale behavior to MFA default
+
+- **Severity:** Low
+- **Location:** `apps/api/test/integration/access-administration.integration.test.ts`.
+- **Issue:** A locale-persistence test asserted `mfa_enabled=false` although integration config defaults to true.
+- **Impact:** Clean-environment integration failed for an unrelated configuration value.
+- **Reproduce:** Run integration without `MFA_ENABLED=false`; 13/14 API tests pass.
+- **Fix:** Removed the unrelated MFA assertion. Rerun: API 14/14 and worker 4/4 pass.
+
+### AUD-FIX-03 — ClamAV INSTREAM client closed before receiving verdict
+
+- **Severity:** High (fixed)
+- **Location:** `apps/worker/src/document-scanner.ts`.
+- **Issue:** The scanner half-closed TCP immediately after the zero-length INSTREAM frame; current ClamAV could close without delivering a verdict, producing `CLAMAV_UNEXPECTED_RESPONSE`.
+- **Impact:** Both clean and infected uploads could fail closed and remain unavailable, blocking document processing.
+- **Reproduce:** Run worker integration against the current `clamav/clamav:stable`; both scanner cases initially returned an empty response.
+- **Fix:** Keep the socket open after the terminator, accumulate the complete `OK`/`FOUND` response, settle once, then close. Rerun: worker integration 4/4 passes, including clean PDF and EICAR.

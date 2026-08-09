@@ -32,6 +32,10 @@ suite("banking persistence and disclosure controls", () => {
     schoolIds: [],
     mfaVerified: true,
   };
+  const superAdminAuth: AuthContext = {
+    ...managerAuth,
+    roles: ["SUPER_ADMIN"],
+  };
 
   beforeAll(async () => {
     db = new DatabaseService();
@@ -77,11 +81,17 @@ suite("banking persistence and disclosure controls", () => {
     await db.onModuleDestroy();
   });
   it("stores ciphertext, masks reads, reviews with locking, and audits re-authenticated reveal", async () => {
-    const saved = await service.save(studentAuth, ids.student, "0", {
-      account_name: "Nguyen Van An",
-      account_number: "0123-456 789",
-      bank_code: "VCB",
-    });
+    const saved = await service.save(
+      studentAuth,
+      ids.student,
+      "0",
+      {
+        account_name: "Nguyen Van An",
+        account_number: "0123-456 789",
+        bank_code: "VCB",
+      },
+      randomUUID(),
+    );
     expect(saved).toMatchObject({
       account_number_masked: "******6789",
       status: "PENDING_REVIEW",
@@ -98,6 +108,42 @@ suite("banking persistence and disclosure controls", () => {
       decision: "VALIDATED",
     });
     expect(reviewed).toMatchObject({ status: "VALIDATED", version: 2 });
+    await expect(
+      service.save(
+        studentAuth,
+        ids.student,
+        '"2"',
+        {
+          account_name: "Nguyen Van An",
+          account_number: "0123456790",
+          bank_code: "VCB",
+          correction_reason: "Correct a confirmed bank account",
+        },
+        randomUUID(),
+      ),
+    ).rejects.toThrow("RESOURCE_NOT_FOUND");
+    const correctionId = randomUUID();
+    const corrected = await service.save(
+      superAdminAuth,
+      ids.student,
+      '"2"',
+      {
+        account_name: "Nguyen Van An",
+        account_number: "0123456790",
+        bank_code: "VCB",
+        correction_reason: "Correct a confirmed bank account",
+      },
+      correctionId,
+    );
+    expect(corrected).toMatchObject({ status: "PENDING_REVIEW", version: 3 });
+    expect(
+      (
+        await db.query(
+          `SELECT 1 FROM audit_events WHERE actor_id=$1 AND action='bank.correct' AND correlation_id=$2`,
+          [ids.manager, correctionId],
+        )
+      ).rowCount,
+    ).toBe(1);
     const correlationId = randomUUID();
     await expect(
       service.reveal(
@@ -118,7 +164,7 @@ suite("banking persistence and disclosure controls", () => {
     );
     expect(revealed).toMatchObject({
       account_name: "Nguyen Van An",
-      account_number: "0123456789",
+      account_number: "0123456790",
     });
     const audit = await db.query(
       `SELECT 1 FROM audit_events WHERE actor_id=$1 AND action='bank.reveal' AND correlation_id=$2`,

@@ -23,6 +23,10 @@ suite("manual transfer persistence workflow", () => {
     schoolIds: [],
     mfaVerified: true,
   };
+  const superAdmin: AuthContext = {
+    ...manager,
+    roles: ["SUPER_ADMIN"],
+  };
   const student: AuthContext = {
     sessionId: randomUUID(),
     userId: ids.studentUser,
@@ -120,20 +124,30 @@ suite("manual transfer persistence workflow", () => {
       { result: "RECEIVED" },
     );
     expect(confirmed.status).toBe("RECEIVED");
+    const correction = {
+      transfer_type: "SCHOLARSHIP",
+      amount: "1255000.00",
+      currency: "VND",
+      transferred_at: new Date().toISOString(),
+      reference: "BANK-REF-001-C",
+      reason_code: "AMOUNT_FIX",
+      reason: "Correct the externally recorded amount",
+    };
+    await expect(
+      service.correct(
+        manager,
+        created.id,
+        String(confirmed.version),
+        "correct-transfer-manager-001",
+        correction,
+      ),
+    ).rejects.toThrow("RESOURCE_NOT_FOUND");
     const replacement = await service.correct(
-      manager,
+      superAdmin,
       created.id,
       String(confirmed.version),
       "correct-transfer-key-001",
-      {
-        transfer_type: "SCHOLARSHIP",
-        amount: "1255000.00",
-        currency: "VND",
-        transferred_at: new Date().toISOString(),
-        reference: "BANK-REF-001-C",
-        reason_code: "AMOUNT_FIX",
-        reason: "Correct the externally recorded amount",
-      },
+      correction,
     );
     expect(replacement.status).toBe("AWAITING_CONFIRMATION");
     const detail = await service.get(manager, created.id);
