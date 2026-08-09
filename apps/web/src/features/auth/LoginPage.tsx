@@ -97,7 +97,8 @@ export function LoginPage() {
         sx={{
           display: { xs: "none", md: "flex" },
           flexDirection: "column",
-          justifyContent: "space-between",
+          justifyContent: "flex-start",
+          position: "relative",
           p: { md: 5, lg: "5.5vh 7vw" },
         }}
       >
@@ -123,7 +124,13 @@ export function LoginPage() {
             </Typography>
           </Box>
         </Stack>
-        <Box sx={{ maxWidth: 700, mb: { md: 5, xl: 9 } }}>
+        <Box
+          sx={{
+            maxWidth: 700,
+            mt: { md: "2vh", lg: "2.5vh" },
+            transform: { md: "translateY(-3vh)", lg: "translateY(-4.5vh)" },
+          }}
+        >
           <Box
             sx={{
               display: "inline-flex",
@@ -147,11 +154,11 @@ export function LoginPage() {
           <Typography
             variant="h2"
             sx={{
-              mt: 2.5,
-              mb: 3,
+              mt: 1.5,
+              mb: 1.75,
               color: "#17366d",
-              fontSize: { md: 39, lg: 49 },
-              lineHeight: 1.12,
+              fontSize: { md: 36, lg: 43 },
+              lineHeight: 1.1,
             }}
           >
             Nền tảng quản lý học bổng
@@ -174,7 +181,7 @@ export function LoginPage() {
               display: "grid",
               gridTemplateColumns: "repeat(3,1fr)",
               gap: 2.5,
-              mt: 5,
+              mt: 2,
             }}
           >
             {benefits.map((benefit) => (
@@ -209,7 +216,16 @@ export function LoginPage() {
             ))}
           </Box>
         </Box>
-        <Typography variant="caption" color="text.secondary">
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            position: "fixed",
+            left: { md: 22, lg: 28 },
+            bottom: { md: 14, lg: 18 },
+            zIndex: 2,
+          }}
+        >
           © 2026 VNSF · Vietnam Scholarship Foundation
         </Typography>
       </Box>
