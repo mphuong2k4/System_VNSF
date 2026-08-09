@@ -102,33 +102,23 @@ export function LoginPage() {
           p: { md: 5, lg: "5.5vh 7vw" },
         }}
       >
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Avatar
-            sx={{
-              width: 48,
-              height: 48,
-              bgcolor: "secondary.main",
-              color: "white",
-              fontSize: 24,
-              fontWeight: 900,
-            }}
-          >
-            V
-          </Avatar>
-          <Box>
-            <Typography variant="h5" sx={{ lineHeight: 1, color: "#143575" }}>
-              VNSF
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Vietnam Scholarship Foundation
-            </Typography>
-          </Box>
-        </Stack>
+        <Box
+          role="img"
+          aria-label="Vietnam Scholarship Foundation"
+          sx={{
+            width: { md: 205, lg: 230 },
+            height: { md: 62, lg: 70 },
+            backgroundImage: "url('/assets/logo-vnsf.png')",
+            backgroundRepeat: "no-repeat",
+            backgroundSize: "112% auto",
+            backgroundPosition: "center 43%",
+          }}
+        />
         <Box
           sx={{
             maxWidth: 700,
-            mt: { md: "2vh", lg: "2.5vh" },
-            transform: { md: "translateY(-3vh)", lg: "translateY(-4.5vh)" },
+            mt: { md: "2.5vh", lg: "3vh" },
+            transform: { md: "translateY(-1vh)", lg: "translateY(-1.25vh)" },
           }}
         >
           <Box
@@ -221,9 +211,11 @@ export function LoginPage() {
           color="text.secondary"
           sx={{
             position: "fixed",
-            left: { md: 22, lg: 28 },
-            bottom: { md: 14, lg: 18 },
+            left: { md: 14, lg: 18 },
+            bottom: { md: 7, lg: 9 },
             zIndex: 2,
+            fontSize: { md: 9, lg: 10 },
+            lineHeight: 1.2,
           }}
         >
           © 2026 VNSF · Vietnam Scholarship Foundation
@@ -250,21 +242,19 @@ export function LoginPage() {
             onSubmit={(event) => void submit(event)}
             noValidate
           >
-            <Avatar
+            <Box
+              role="img"
+              aria-label="Vietnam Scholarship Foundation"
               sx={{
                 mx: "auto",
-                width: 68,
-                height: 68,
-                bgcolor: "secondary.main",
-                color: "white",
-                fontSize: 31,
-                fontWeight: 900,
-                border: "8px solid #f1f7ff",
-                boxShadow: "0 0 0 1px #d7e8fa",
+                width: { xs: 130, sm: 150 },
+                height: { xs: 54, sm: 62 },
+                backgroundImage: "url('/assets/logo-vnsf.png')",
+                backgroundRepeat: "no-repeat",
+                backgroundSize: "112% auto",
+                backgroundPosition: "center 43%",
               }}
-            >
-              V
-            </Avatar>
+            />
             <Box sx={{ textAlign: "center" }}>
               <Typography variant="h3" sx={{ fontSize: { xs: 28, sm: 34 } }}>
                 Đăng nhập hệ thống
