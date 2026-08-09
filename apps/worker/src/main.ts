@@ -62,6 +62,7 @@ async function dispatchBatch(): Promise<void> {
         attempts: 5,
         backoff: { type: "exponential", delay: 1_000 },
         removeOnComplete: { age: 86_400 },
+        removeOnFail: false,
       });
       await database.query(
         `UPDATE outbox_events SET processed_at=now() WHERE id=$1 AND processed_at IS NULL`,
@@ -69,12 +70,47 @@ async function dispatchBatch(): Promise<void> {
       );
     } catch {
       await database.query(
-        `UPDATE outbox_events SET attempts=attempts+1,available_at=now()+LEAST(interval '1 minute',interval '1 second'*power(2,attempts+1)) WHERE id=$1`,
+        `WITH failed AS (
+           UPDATE outbox_events
+           SET attempts=attempts+1,
+               available_at=now()+LEAST(interval '1 minute',interval '1 second'*power(2,attempts+1))
+           WHERE id=$1 AND processed_at IS NULL
+           RETURNING id,event_type,payload,attempts
+         ), dead AS (
+           INSERT INTO queue_dead_letters(job_id,job_name,payload,failure_code,attempts)
+           SELECT id::text,event_type,payload,'OUTBOX_DISPATCH_FAILED',attempts FROM failed WHERE attempts>=10
+           ON CONFLICT(job_id) DO NOTHING
+           RETURNING job_id
+         )
+         UPDATE outbox_events SET processed_at=now()
+         WHERE id::text IN (SELECT job_id FROM dead)`,
         [event.id],
       );
     }
   }
 }
+
+consumer.on("failed", (job, error) => {
+  if (!job || job.attemptsMade < Number(job.opts.attempts ?? 1)) return;
+  const failureCode = error.message
+    .split(":", 1)[0]!
+    .replace(/[^A-Z0-9_.-]/gi, "_")
+    .slice(0, 120);
+  void database
+    .query(
+      `INSERT INTO queue_dead_letters(job_id,job_name,payload,failure_code,attempts)
+       VALUES($1,$2,$3,$4,$5)
+       ON CONFLICT(job_id) DO UPDATE SET failure_code=excluded.failure_code,attempts=excluded.attempts,failed_at=now()`,
+      [
+        String(job.id),
+        job.name,
+        job.data,
+        failureCode || "JOB_FAILED",
+        job.attemptsMade,
+      ],
+    )
+    .catch(() => undefined);
+});
 
 async function run(): Promise<void> {
   let nextReconciliation = 0;

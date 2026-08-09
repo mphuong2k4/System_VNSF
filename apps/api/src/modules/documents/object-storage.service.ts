@@ -37,12 +37,11 @@ export class ObjectStorageService {
       }),
     );
   }
-  async prefix(key: string) {
+  async read(key: string) {
     const result = await this.client.send(
       new GetObjectCommand({
         Bucket: this.config.OBJECT_STORAGE_BUCKET,
         Key: key,
-        Range: "bytes=0-4095",
       }),
     );
     return Buffer.from(await result.Body!.transformToByteArray());

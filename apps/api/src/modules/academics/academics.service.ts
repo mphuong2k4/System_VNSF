@@ -19,8 +19,23 @@ const createSchema = z
     type: z.string().min(2).max(30),
   })
   .strict();
+const academicPayloadSchema = z
+  .object({
+    academic_year: z.string().regex(/^\d{4}-\d{4}$/),
+    term: z.string().min(1).max(50),
+    gpa_value: z.number().nonnegative().max(100),
+    gpa_scale: z.number().positive().max(100),
+    credits: z.number().nonnegative().max(500).optional(),
+    classification: z.string().min(1).max(100).optional(),
+    notes: z.string().max(2000).optional(),
+  })
+  .strict()
+  .refine((value) => value.gpa_value <= value.gpa_scale, {
+    message: "GPA_EXCEEDS_SCALE",
+    path: ["gpa_value"],
+  });
 const draftSchema = z
-  .object({ payload: z.record(z.string(), z.unknown()) })
+  .object({ payload: academicPayloadSchema })
   .strict()
   .refine(
     (value) =>
@@ -221,6 +236,14 @@ export class AcademicsService {
         [id],
       );
       if (unsafe.rowCount) throw new DomainError("FILE_NOT_CLEAN", 422);
+      const cleanEvidence = await client.query(
+        `SELECT 1 FROM document_links dl JOIN documents d ON d.id=dl.document_id
+         WHERE dl.owner_type='SUBMISSION' AND dl.owner_id=$1
+           AND d.scan_status='CLEAN' AND d.storage_status='PROMOTED' LIMIT 1`,
+        [id],
+      );
+      if (!cleanEvidence.rowCount)
+        throw new DomainError("TRANSCRIPT_EVIDENCE_REQUIRED", 422);
       const period = await client.query<{ due_at: Date }>(
         `SELECT due_at FROM academic_periods WHERE id=$1`,
         [submission.period_id],

@@ -72,4 +72,25 @@ export class StudentsController {
   ) {
     return this.service.transfer(request.auth, id, etag, body);
   }
+  @Get(":id/identity") identity(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+  ) {
+    return this.service.identity(request.auth, id);
+  }
+  @Patch(":id/identity") updateIdentity(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Headers("if-match") etag: string | undefined,
+    @Body() body: unknown,
+  ) {
+    return this.service.updateIdentity(request.auth, id, etag, body);
+  }
+  @Post(":id/identity/reveal") revealIdentity(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    return this.service.revealIdentity(request.auth, id, body);
+  }
 }

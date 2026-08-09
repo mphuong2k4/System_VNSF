@@ -1186,6 +1186,127 @@ paths:
         "200": { description: Prometheus metrics }
         "400": { $ref: "#/components/responses/BadRequest" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /auth/profile/preferences:
+    get:
+      summary: Read the authenticated user's locale preference
+      operationId: getProfilePreferences
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: Current locale preference }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      summary: Persist the authenticated user's locale preference
+      operationId: updateProfilePreferences
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { description: Updated locale preference }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /administration/users:
+    get:
+      summary: List users with effective roles and school scope
+      operationId: listUsers
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: Scoped administration user list }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Create a pending user and send an activation event
+      operationId: createUser
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { description: Pending user created }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /administration/users/{id}:
+    patch:
+      summary: Versioned user status, locale, role and school-scope update
+      operationId: updateUserAccess
+      parameters:
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
+        - { $ref: "#/components/parameters/IfMatch" }
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { description: User updated and active sessions revoked }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+  /administration/roles:
+    get:
+      summary: List assignable system roles
+      operationId: listRoles
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: Role catalog }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /administration/schools:
+    get:
+      summary: List schools available for assignment
+      operationId: listAssignmentSchools
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: School catalog }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /break-glass:
+    get:
+      summary: List the current administrator's break-glass evidence
+      operationId: listBreakGlassSessions
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: Break-glass evidence }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Start a reauthenticated, MFA-verified and time-boxed break-glass session
+      operationId: startBreakGlass
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { description: Break-glass session started }
+        "403": { description: Recent reauthentication required }
+  /break-glass/{id}:
+    delete:
+      summary: Explicitly end a break-glass session
+      operationId: endBreakGlass
+      parameters:
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { description: Break-glass session ended }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /students/{studentId}/identity:
+    get:
+      summary: Read masked student identity metadata
+      operationId: getStudentIdentity
+      parameters: [{ $ref: "#/components/parameters/StudentId" }]
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: Masked identity and version }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      summary: Create or version-update an encrypted student identity number
+      operationId: updateStudentIdentity
+      parameters:
+        - { $ref: "#/components/parameters/StudentId" }
+        - { $ref: "#/components/parameters/IfMatch" }
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { description: Masked identity and new version }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /students/{studentId}/identity/reveal:
+    post:
+      summary: Reveal identity under recent reauthentication and scoped break-glass
+      operationId: revealStudentIdentity
+      parameters: [{ $ref: "#/components/parameters/StudentId" }]
+      security: [{ sessionCookie: [], csrfToken: [] }]
+      responses:
+        "200": { description: Revealed identity number }
+        "403": { description: Break-glass scope required }
 components:
   securitySchemes:
     sessionCookie:
@@ -1267,7 +1388,10 @@ components:
         ]
       properties:
         owner_type:
-          { type: string, enum: [STUDENT, SUBMISSION, EDUCATION_EXPENSE] }
+          {
+            type: string,
+            enum: [STUDENT, SUBMISSION, EDUCATION_EXPENSE, THANK_YOU_LETTER],
+          }
         owner_id: { type: string, format: uuid }
         purpose: { type: string, minLength: 2, maxLength: 40 }
         filename: { type: string, minLength: 1, maxLength: 255 }
@@ -1287,7 +1411,19 @@ components:
       type: object
       additionalProperties: false
       required: [payload]
-      properties: { payload: { type: object, additionalProperties: true } }
+      properties:
+        payload:
+          type: object
+          additionalProperties: false
+          required: [academic_year, term, gpa_value, gpa_scale]
+          properties:
+            academic_year: { type: string, pattern: "^\\d{4}-\\d{4}$" }
+            term: { type: string, minLength: 1, maxLength: 50 }
+            gpa_value: { type: number, minimum: 0, maximum: 100 }
+            gpa_scale: { type: number, exclusiveMinimum: 0, maximum: 100 }
+            credits: { type: number, minimum: 0, maximum: 500 }
+            classification: { type: string, minLength: 1, maxLength: 100 }
+            notes: { type: string, maxLength: 2000 }
     SubmissionReviewInput:
       type: object
       additionalProperties: false

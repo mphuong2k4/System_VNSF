@@ -3,6 +3,7 @@ import {
   Catch,
   ExceptionFilter,
   HttpException,
+  Logger,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { ZodError } from "zod";
@@ -11,6 +12,8 @@ type CorrelatedRequest = Request & { correlationId?: string };
 
 @Catch()
 export class ErrorFilter implements ExceptionFilter {
+  private readonly logger = new Logger(ErrorFilter.name);
+
   catch(error: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse<Response>();
     const request = host.switchToHttp().getRequest<CorrelatedRequest>();
@@ -30,6 +33,21 @@ export class ErrorFilter implements ExceptionFilter {
           : status === 500
             ? "INTERNAL_ERROR"
             : "REQUEST_REJECTED";
+    if (status >= 500) {
+      const detail =
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : "Unknown non-error exception";
+      this.logger.error(
+        JSON.stringify({
+          event: "unhandled_request_error",
+          correlation_id: request.correlationId,
+          method: request.method,
+          route: request.originalUrl?.split("?")[0],
+          detail,
+        }),
+      );
+    }
     response.status(status).json({
       code,
       message_key: `errors.${code}`,

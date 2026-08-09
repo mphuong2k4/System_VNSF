@@ -39,6 +39,11 @@ type History = {
   effective_to: string | null;
   change_reason: string;
 };
+type IdentityView = {
+  configured: boolean;
+  identity_masked?: string;
+  version: number;
+};
 
 export function StudentsPage() {
   const { t } = useTranslation();
@@ -152,6 +157,7 @@ export function StudentsPage() {
 function StudentDetails({ student }: { student: Student }) {
   const { t } = useTranslation();
   const client = useQueryClient();
+  const [revealedIdentity, setRevealedIdentity] = useState("");
   const guardians = useQuery({
     queryKey: ["students", student.id, "guardians"],
     queryFn: () => api<Guardian[]>(`/students/${student.id}/guardians`),
@@ -159,6 +165,33 @@ function StudentDetails({ student }: { student: Student }) {
   const history = useQuery({
     queryKey: ["students", student.id, "history"],
     queryFn: () => api<History[]>(`/students/${student.id}/school-history`),
+  });
+  const identity = useQuery({
+    queryKey: ["students", student.id, "identity"],
+    queryFn: () => api<IdentityView>(`/students/${student.id}/identity`),
+  });
+  const updateIdentity = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api(`/students/${student.id}/identity`, {
+        method: "PATCH",
+        headers: { "if-match": String(identity.data?.version ?? 0) },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: async () =>
+      client.invalidateQueries({
+        queryKey: ["students", student.id, "identity"],
+      }),
+  });
+  const revealIdentity = useMutation({
+    mutationFn: (reason: string) =>
+      api<{ identity_number: string }>(
+        `/students/${student.id}/identity/reveal`,
+        { method: "POST", body: JSON.stringify({ reason }) },
+      ),
+    onSuccess: (result) => {
+      setRevealedIdentity(result.identity_number);
+      window.setTimeout(() => setRevealedIdentity(""), 60_000);
+    },
   });
   const addGuardian = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
@@ -189,9 +222,65 @@ function StudentDetails({ student }: { student: Student }) {
     <Paper sx={{ p: 2 }}>
       <Stack spacing={2}>
         <Typography variant="h5">{student.full_name}</Typography>
-        {(addGuardian.isError || transfer.isError) && (
+        {(addGuardian.isError ||
+          transfer.isError ||
+          updateIdentity.isError ||
+          revealIdentity.isError) && (
           <Alert severity="error">{t("errors.INTERNAL_ERROR")}</Alert>
         )}
+        <Typography variant="h6">{t("student.identity")}</Typography>
+        <Typography>
+          {revealedIdentity ||
+            identity.data?.identity_masked ||
+            t("student.identityMissing")}
+        </Typography>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            const data = Object.fromEntries(new FormData(event.currentTarget));
+            updateIdentity.mutate({
+              identity_number: entry(data.identity_number),
+              reason: entry(data.identity_reason),
+            });
+            event.currentTarget.reset();
+          }}
+        >
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+            <TextField
+              name="identity_number"
+              label={t("student.identityNumber")}
+              inputProps={{ inputMode: "numeric", pattern: "[0-9]{9,12}" }}
+              required
+            />
+            <TextField
+              name="identity_reason"
+              label={t("student.identityReason")}
+              required
+            />
+            <Button type="submit" disabled={updateIdentity.isPending}>
+              {t("student.identitySave")}
+            </Button>
+          </Stack>
+        </form>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            const data = Object.fromEntries(new FormData(event.currentTarget));
+            revealIdentity.mutate(entry(data.reveal_reason));
+            event.currentTarget.reset();
+          }}
+        >
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+            <TextField
+              name="reveal_reason"
+              label={t("student.revealReason")}
+              required
+            />
+            <Button type="submit" disabled={revealIdentity.isPending}>
+              {t("student.identityReveal")}
+            </Button>
+          </Stack>
+        </form>
         <Typography variant="h6">{t("student.guardians")}</Typography>
         {guardians.isLoading && <Skeleton height={50} />}
         {guardians.data?.map((guardian) => (

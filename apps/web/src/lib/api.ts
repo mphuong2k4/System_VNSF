@@ -12,6 +12,7 @@ export class HttpError extends Error {
     super(body.code);
   }
 }
+export const AUTHENTICATION_REQUIRED_EVENT = "vnsf:authentication-required";
 export function cookie(name: string, cookieHeader = document.cookie) {
   return (
     cookieHeader
@@ -32,6 +33,19 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     credentials: "include",
   });
   const body: unknown = await response.json();
-  if (!response.ok) throw new HttpError(response.status, body as ApiError);
+  if (!response.ok) {
+    const error = new HttpError(response.status, body as ApiError);
+    if (
+      response.status === 401 &&
+      ["AUTH_REQUIRED", "AUTH_MFA_REQUIRED"].includes(error.body.code)
+    ) {
+      window.dispatchEvent(
+        new CustomEvent(AUTHENTICATION_REQUIRED_EVENT, {
+          detail: { code: error.body.code },
+        }),
+      );
+    }
+    throw error;
+  }
   return (body as { data: T }).data;
 }

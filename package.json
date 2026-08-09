@@ -6,14 +6,27 @@
   "engines": {
     "node": ">=22 <23"
   },
+  "pnpm": {
+    "overrides": {
+      "form-data": "4.0.6",
+      "glob": "11.1.0",
+      "js-yaml": "4.3.1",
+      "multer": "2.2.0",
+      "nanoid": "3.3.17",
+      "path-to-regexp": "8.4.0",
+      "picomatch@>=4.0.0 <4.0.4": "4.0.4"
+    }
+  },
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "test:integration": "pnpm --filter @vnsf/api test:integration",
+    "test:integration": "pnpm --filter @vnsf/api test:integration && pnpm --filter @vnsf/worker test:integration",
     "test:e2e": "pnpm --filter @vnsf/web test:e2e",
     "test:security": "pnpm --filter @vnsf/api test:security",
-    "test:perf": "k6 run tests/performance/smoke.js",
+    "test:perf": "node tests/performance/smoke.mjs",
+    "test:perf:k6": "k6 run tests/performance/smoke.js",
+    "test:dr": "node tests/operations/backup-restore.mjs",
     "lint": "pnpm -r lint",
     "format:check": "prettier --check .",
     "dev": "pnpm --parallel --filter @vnsf/api --filter @vnsf/worker --filter @vnsf/web dev",

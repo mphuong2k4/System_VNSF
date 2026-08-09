@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:integration": "vitest run test/integration --no-file-parallelism --maxWorkers=1",
     "test:security": "vitest run test/security",
+    "seed:e2e": "node test/e2e-seed.mjs",
     "db:migrate": "node dist/database/migrate.js"
   },
   "dependencies": {
@@ -43,6 +44,6 @@
     "eslint": "9.30.1",
     "supertest": "7.1.3",
     "typescript": "5.8.3",
-    "vitest": "3.2.4"
+    "vitest": "3.2.6"
   }
 }

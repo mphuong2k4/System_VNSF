@@ -39,6 +39,15 @@ const transferSchema = z
     (value) => value.effective_from <= new Date().toISOString().slice(0, 10),
     "SCHOOL_TRANSFER_FUTURE_DATE",
   );
+const identitySchema = z
+  .object({
+    identity_number: z.string().regex(/^\d{9,12}$/),
+    reason: z.string().min(10).max(500),
+  })
+  .strict();
+const revealIdentitySchema = z
+  .object({ reason: z.string().min(20).max(1000) })
+  .strict();
 type StudentRow = z.infer<typeof schema> & {
   id: string;
   version: number;
@@ -388,6 +397,114 @@ export class StudentsService {
         throw new DomainError("SCHOOL_TRANSFER_DATE_CONFLICT", 409);
       throw error;
     }
+  }
+
+  async identity(auth: AuthContext, id: string) {
+    const student = await this.get(auth, id);
+    const actor = toActor(auth);
+    if (
+      !can(actor, "student.read", {
+        studentId: id,
+        schoolId: student.current_school_id,
+      }) &&
+      !can(actor, "student.self", { studentId: id })
+    )
+      throw new DomainError("RESOURCE_NOT_FOUND", 404);
+    const row = (
+      await this.db.query<{ ciphertext: Buffer; version: number }>(
+        `SELECT ciphertext,version FROM student_identity WHERE student_id=$1`,
+        [id],
+      )
+    ).rows[0];
+    if (!row) return { configured: false, version: 0 };
+    const plain = this.crypto.decrypt(row.ciphertext);
+    return {
+      configured: true,
+      identity_masked: `${"*".repeat(Math.max(0, plain.length - 4))}${plain.slice(-4)}`,
+      version: row.version,
+    };
+  }
+
+  async updateIdentity(
+    auth: AuthContext,
+    id: string,
+    etag: string | undefined,
+    input: unknown,
+  ) {
+    const student = await this.get(auth, id);
+    if (
+      !can(toActor(auth), "student.write", {
+        studentId: id,
+        schoolId: student.current_school_id,
+      })
+    )
+      throw new DomainError("RESOURCE_NOT_FOUND", 404);
+    if (!etag) throw new DomainError("PRECONDITION_REQUIRED", 428);
+    const expected = Number(etag.replaceAll('"', ""));
+    if (!Number.isInteger(expected) || expected < 0)
+      throw new DomainError("PRECONDITION_INVALID", 400);
+    const value = identitySchema.parse(input);
+    try {
+      return await this.db.transaction(async (client) => {
+        const result = await client.query<{ version: number }>(
+          `INSERT INTO student_identity(student_id,ciphertext,key_version,identity_hmac,updated_by,version)
+           SELECT $1,$2,1,$3,$4,1 WHERE $5=0
+           ON CONFLICT(student_id) DO UPDATE SET ciphertext=excluded.ciphertext,
+             identity_hmac=excluded.identity_hmac,updated_by=excluded.updated_by,
+             updated_at=now(),version=student_identity.version+1
+           WHERE student_identity.version=$5
+           RETURNING version`,
+          [
+            id,
+            this.crypto.encrypt(value.identity_number),
+            this.crypto.hash(value.identity_number),
+            auth.userId,
+            expected,
+          ],
+        );
+        if (!result.rows[0]) throw new DomainError("VERSION_CONFLICT", 409);
+        await client.query(
+          `INSERT INTO audit_events(actor_id,action,resource_type,resource_id,result,after_redacted,correlation_id)
+           VALUES($1,'student.identity.updated','student',$2,'SUCCESS',$3,gen_random_uuid())`,
+          [auth.userId, id, JSON.stringify({ reason: value.reason })],
+        );
+        return {
+          configured: true,
+          identity_masked: `${"*".repeat(value.identity_number.length - 4)}${value.identity_number.slice(-4)}`,
+          version: result.rows[0].version,
+        };
+      });
+    } catch (error) {
+      if (isUniqueViolation(error))
+        throw new DomainError("STUDENT_IDENTITY_DUPLICATE", 409);
+      throw error;
+    }
+  }
+
+  async revealIdentity(auth: AuthContext, id: string, input: unknown) {
+    const value = revealIdentitySchema.parse(input);
+    const student = await this.get(auth, id);
+    if (!auth.roles.includes("SUPER_ADMIN"))
+      throw new DomainError("RESOURCE_NOT_FOUND", 404);
+    return this.db.transaction(async (client) => {
+      const access = (
+        await client.query<{ ciphertext: Buffer }>(
+          `SELECT si.ciphertext FROM student_identity si
+           JOIN sessions s ON s.id=$2 AND s.user_id=$3 AND s.reauthenticated_at>now()-interval '5 minutes'
+           JOIN break_glass_sessions bg ON bg.session_id=s.id AND bg.revoked_at IS NULL AND bg.expires_at>now()
+           WHERE si.student_id=$1
+             AND (bg.scope_json->'student_ids' ? $1::text OR bg.scope_json->'school_ids' ? $4::text)`,
+          [id, auth.sessionId, auth.userId, student.current_school_id],
+        )
+      ).rows[0];
+      if (!access) throw new DomainError("BREAK_GLASS_REQUIRED", 403);
+      await client.query(
+        `INSERT INTO audit_events(actor_id,action,resource_type,resource_id,result,after_redacted,correlation_id)
+         VALUES($1,'student.identity.revealed','student',$2,'SUCCESS',$3,gen_random_uuid())`,
+        [auth.userId, id, JSON.stringify({ reason: value.reason })],
+      );
+      return { identity_number: this.crypto.decrypt(access.ciphertext) };
+    });
   }
 }
 export type Contact = { phone?: string; email?: string };

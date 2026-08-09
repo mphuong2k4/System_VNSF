@@ -26,7 +26,15 @@ export function MfaPage() {
         method: "POST",
         body: JSON.stringify(value),
       });
-      location.assign("/");
+      const requested = new URLSearchParams(location.search).get("returnTo");
+      const stored = sessionStorage.getItem("vnsf_return_to");
+      const candidate = requested ?? stored;
+      const returnTo =
+        candidate?.startsWith("/") && !candidate.startsWith("//")
+          ? candidate
+          : "/";
+      sessionStorage.removeItem("vnsf_return_to");
+      location.assign(returnTo);
     } catch (error) {
       setMessage(
         error instanceof HttpError

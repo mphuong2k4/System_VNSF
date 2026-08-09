@@ -6,6 +6,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { Pool } from "pg";
+import { createHash } from "node:crypto";
 
 const enabled = process.env.RUN_INTEGRATION === "true";
 const suite = enabled ? describe : describe.skip;
@@ -64,8 +65,8 @@ suite("document scanner adapters", () => {
     async (_label, body, scanStatus, storageStatus) => {
       const inserted = await database.query<{ id: string }>(
         `INSERT INTO documents(object_key,checksum,size_bytes,mime_type,scan_status,storage_status,completed_at)
-       VALUES('pending','0000000000000000000000000000000000000000000000000000000000000000',$1,'application/pdf','PENDING','QUARANTINED',now()) RETURNING id`,
-        [body.length],
+       VALUES('pending',$1,$2,'application/pdf','PENDING','QUARANTINED',now()) RETURNING id`,
+        [createHash("sha256").update(body).digest("hex"), body.length],
       );
       const id = inserted.rows[0]!.id;
       documentIds.push(id);

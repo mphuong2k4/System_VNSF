@@ -2,9 +2,11 @@ import { Injectable } from "@nestjs/common";
 import * as argon2 from "argon2";
 import { randomBytes } from "node:crypto";
 import { authenticator } from "otplib";
+import type { PoolClient } from "pg";
 import { DatabaseService } from "../../database/database.service.js";
 import { DomainError } from "../../platform/error.filter.js";
 import { CryptoService } from "./crypto.service.js";
+import type { AuthContext } from "./session.guard.js";
 type UserRow = {
   id: string;
   email: string;
@@ -58,9 +60,18 @@ export class IdentityService {
     return this.createSession(user.id, !user.requires_mfa);
   }
   async createSession(userId: string, mfaVerified: boolean) {
+    return this.db.transaction((client) =>
+      this.insertSession(client, userId, mfaVerified),
+    );
+  }
+  private async insertSession(
+    client: Pick<PoolClient, "query">,
+    userId: string,
+    mfaVerified: boolean,
+  ) {
     const token = randomBytes(32).toString("base64url");
     const csrf = randomBytes(32).toString("base64url");
-    const result = await this.db.query<{ id: string }>(
+    const result = await client.query<{ id: string }>(
       `INSERT INTO sessions(user_id,token_hash,csrf_hash,mfa_verified_at,expires_at) VALUES($1,$2,$3,CASE WHEN $4 THEN now() END,now()+interval '8 hours') RETURNING id`,
       [
         userId,
@@ -141,11 +152,10 @@ export class IdentityService {
       !authenticator.check(code, this.crypto.decrypt(factor.secret_ciphertext))
     )
       throw new DomainError("MFA_CODE_INVALID", 401);
-    await this.db.query(
-      `UPDATE sessions SET mfa_verified_at=now() WHERE id=$1`,
-      [session.id],
-    );
-    return { verified: true };
+    return this.db.transaction(async (client) => {
+      const rotated = await this.rotateMfaSessionWithClient(client, session);
+      return { verified: true, ...rotated };
+    });
   }
   async beginMfaEnrollment(token: string, email: string) {
     const session = await this.session(token);
@@ -179,7 +189,7 @@ export class IdentityService {
     const recoveryCodes = Array.from({ length: 8 }, () =>
       randomBytes(9).toString("base64url"),
     );
-    await this.db.transaction(async (client) => {
+    const rotated = await this.db.transaction(async (client) => {
       await client.query(
         `UPDATE mfa_factors SET verified_at=now() WHERE id=$1`,
         [factor.id],
@@ -190,12 +200,9 @@ export class IdentityService {
           [factor.id, await argon2.hash(recovery)],
         );
       }
-      await client.query(
-        `UPDATE sessions SET mfa_verified_at=now() WHERE id=$1`,
-        [session.id],
-      );
+      return this.rotateMfaSessionWithClient(client, session);
     });
-    return { recovery_codes: recoveryCodes };
+    return { recovery_codes: recoveryCodes, ...rotated };
   }
   async verifyRecoveryCode(token: string, code: string) {
     const session = await this.session(token);
@@ -205,18 +212,28 @@ export class IdentityService {
     );
     const matched = await this.findRecovery(result.rows, code);
     if (!matched) throw new DomainError("MFA_RECOVERY_INVALID", 401);
-    await this.db.transaction(async (client) => {
+    return this.db.transaction(async (client) => {
       const used = await client.query(
         `UPDATE mfa_recovery_codes SET used_at=now() WHERE id=$1 AND used_at IS NULL RETURNING id`,
         [matched],
       );
       if (!used.rowCount) throw new DomainError("MFA_RECOVERY_INVALID", 401);
-      await client.query(
-        `UPDATE sessions SET mfa_verified_at=now() WHERE id=$1`,
-        [session.id],
-      );
+      const rotated = await this.rotateMfaSessionWithClient(client, session);
+      return { verified: true, ...rotated };
     });
-    return { verified: true };
+  }
+  private async rotateMfaSessionWithClient(
+    client: PoolClient,
+    session: SessionRow,
+  ) {
+    const revoked = await client.query(
+      `UPDATE sessions SET revoked_at=now(),revoke_reason='MFA_ROTATED'
+       WHERE id=$1 AND revoked_at IS NULL RETURNING id`,
+      [session.id],
+    );
+    if (!revoked.rowCount) throw new DomainError("AUTH_REQUIRED", 401);
+    const replacement = await this.insertSession(client, session.user_id, true);
+    return { token: replacement.token, csrf: replacement.csrf };
   }
   private async findRecovery(
     rows: { id: string; code_hash: string }[],
@@ -305,6 +322,37 @@ export class IdentityService {
     );
     return { reauthenticated: true, valid_for_seconds: 300 };
   }
+  async preferences(auth: AuthContext) {
+    const row = (
+      await this.db.query<{ preferred_locale: "vi-VN" | "en-US" }>(
+        `SELECT preferred_locale FROM users WHERE id=$1 AND status='ACTIVE'`,
+        [auth.userId],
+      )
+    ).rows[0];
+    if (!row) throw new DomainError("AUTH_REQUIRED", 401);
+    return row;
+  }
+  async updatePreferences(
+    auth: AuthContext,
+    preferredLocale: "vi-VN" | "en-US",
+  ) {
+    return this.db.transaction(async (client) => {
+      const row = (
+        await client.query<{ preferred_locale: "vi-VN" | "en-US" }>(
+          `UPDATE users SET preferred_locale=$2,version=version+1,updated_at=now()
+           WHERE id=$1 AND status='ACTIVE' RETURNING preferred_locale`,
+          [auth.userId, preferredLocale],
+        )
+      ).rows[0];
+      if (!row) throw new DomainError("AUTH_REQUIRED", 401);
+      await client.query(
+        `INSERT INTO audit_events(actor_id,action,resource_type,resource_id,result,after_redacted,correlation_id)
+         VALUES($1,'user.locale.updated','user',$1,'SUCCESS',$2,gen_random_uuid())`,
+        [auth.userId, JSON.stringify(row)],
+      );
+      return row;
+    });
+  }
   async listSessions(token: string) {
     const current = await this.session(token);
     const result = await this.db.query(
@@ -327,5 +375,23 @@ export class IdentityService {
       `UPDATE sessions SET revoked_at=now(),revoke_reason='LOGOUT' WHERE token_hash=$1 AND revoked_at IS NULL`,
       [this.crypto.tokenHash(token)],
     );
+  }
+  async enforceRateLimit(
+    scopeKey: string,
+    limit: number,
+    windowSeconds: number,
+  ) {
+    const result = await this.db.query<{ hits: number }>(
+      `INSERT INTO request_rate_limits(scope_key,window_started_at,hits,expires_at)
+       VALUES($1,now(),1,now()+make_interval(secs=>$2))
+       ON CONFLICT(scope_key) DO UPDATE SET
+         window_started_at=CASE WHEN request_rate_limits.expires_at<=now() THEN now() ELSE request_rate_limits.window_started_at END,
+         hits=CASE WHEN request_rate_limits.expires_at<=now() THEN 1 ELSE request_rate_limits.hits+1 END,
+         expires_at=CASE WHEN request_rate_limits.expires_at<=now() THEN now()+make_interval(secs=>$2) ELSE request_rate_limits.expires_at END
+       RETURNING hits`,
+      [scopeKey, windowSeconds],
+    );
+    if (result.rows[0]!.hits > limit)
+      throw new DomainError("RATE_LIMIT_EXCEEDED", 429);
   }
 }

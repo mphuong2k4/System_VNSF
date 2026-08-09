@@ -1,0 +1,54 @@
+services:
+  migrate:
+    image: ${VNSF_API_IMAGE:?Set VNSF_API_IMAGE to an immutable image tag or digest}
+    command: ["node", "apps/api/dist/database/migrate.js"]
+    env_file: [.env.staging]
+    restart: "no"
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+
+  api:
+    image: ${VNSF_API_IMAGE:?Set VNSF_API_IMAGE to an immutable image tag or digest}
+    env_file: [.env.staging]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3000/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    image: ${VNSF_WORKER_IMAGE:?Set VNSF_WORKER_IMAGE to an immutable image tag or digest}
+    env_file: [.env.staging]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    image: ${VNSF_WEB_IMAGE:?Set VNSF_WEB_IMAGE to an immutable image tag or digest}
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    ports: ["127.0.0.1:${VNSF_STAGING_PORT:-8080}:8080"]
+    depends_on:
+      api: { condition: service_healthy }

@@ -3,6 +3,7 @@ node_modules/
 .runtime/
 dist/
 .env
+.env.staging
 coverage/
 playwright-report/
 test-results/

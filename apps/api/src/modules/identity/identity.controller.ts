@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   Res,
@@ -12,6 +13,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { IdentityService } from "./identity.service.js";
 import { AllowPendingMfa, Public } from "./auth.decorators.js";
+import type { AuthenticatedRequest } from "./session.guard.js";
 const loginSchema = z
   .object({ email: z.string().email(), password: z.string().min(8).max(200) })
   .strict();
@@ -24,6 +26,9 @@ const tokenPasswordSchema = passwordSchema
   .extend({ token: z.string().min(32).max(200) })
   .strict();
 const emailSchema = z.object({ email: z.string().email() }).strict();
+const preferenceSchema = z
+  .object({ preferred_locale: z.enum(["vi-VN", "en-US"]) })
+  .strict();
 @Controller("auth")
 export class IdentityController {
   constructor(private readonly identity: IdentityService) {}
@@ -40,8 +45,17 @@ export class IdentityController {
   }
   @AllowPendingMfa()
   @Post("mfa/verify")
-  async mfa(@Req() req: Request, @Body() body: unknown) {
-    return this.identity.verifyMfa(this.token(req), mfaSchema.parse(body).code);
+  async mfa(
+    @Req() req: Request,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.identity.verifyMfa(
+      this.token(req),
+      mfaSchema.parse(body).code,
+    );
+    this.cookies(res, result.token, result.csrf);
+    return { verified: true, csrf_token: result.csrf };
   }
   @AllowPendingMfa()
   @Post("mfa/enroll")
@@ -53,19 +67,31 @@ export class IdentityController {
   }
   @AllowPendingMfa()
   @Post("mfa/enroll/confirm")
-  confirmEnrollment(@Req() req: Request, @Body() body: unknown) {
-    return this.identity.confirmMfaEnrollment(
+  async confirmEnrollment(
+    @Req() req: Request,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.identity.confirmMfaEnrollment(
       this.token(req),
       mfaSchema.parse(body).code,
     );
+    this.cookies(res, result.token, result.csrf);
+    return { recovery_codes: result.recovery_codes, csrf_token: result.csrf };
   }
   @AllowPendingMfa()
   @Post("mfa/recovery/verify")
-  recovery(@Req() req: Request, @Body() body: unknown) {
-    return this.identity.verifyRecoveryCode(
+  async recovery(
+    @Req() req: Request,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.identity.verifyRecoveryCode(
       this.token(req),
       recoverySchema.parse(body).code,
     );
+    this.cookies(res, result.token, result.csrf);
+    return { verified: true, csrf_token: result.csrf };
   }
   @Public()
   @Post("password/forgot")
@@ -117,6 +143,17 @@ export class IdentityController {
   }
   @Delete("sessions/:id") revoke(@Req() req: Request, @Param("id") id: string) {
     return this.identity.revoke(this.token(req), id);
+  }
+  @Get("profile/preferences")
+  preferences(@Req() req: AuthenticatedRequest) {
+    return this.identity.preferences(req.auth);
+  }
+  @Patch("profile/preferences")
+  updatePreferences(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    return this.identity.updatePreferences(
+      req.auth,
+      preferenceSchema.parse(body).preferred_locale,
+    );
   }
   private token(req: Request) {
     return String(req.cookies?.vnsf_session ?? "");

@@ -33,6 +33,10 @@ import { GovernanceService } from "./modules/governance/governance.service.js";
 import { MetricsController } from "./platform/metrics.controller.js";
 import { MetricsService } from "./platform/metrics.service.js";
 import { ObservabilityInterceptor } from "./platform/observability.interceptor.js";
+import { AdministrationController } from "./modules/administration/administration.controller.js";
+import { AdministrationService } from "./modules/administration/administration.service.js";
+import { BreakGlassController } from "./modules/breakglass/breakglass.controller.js";
+import { BreakGlassService } from "./modules/breakglass/breakglass.service.js";
 
 @Module({
   controllers: [
@@ -50,6 +54,8 @@ import { ObservabilityInterceptor } from "./platform/observability.interceptor.j
     ReportingController,
     GovernanceController,
     MetricsController,
+    AdministrationController,
+    BreakGlassController,
   ],
   providers: [
     DatabaseService,
@@ -69,6 +75,8 @@ import { ObservabilityInterceptor } from "./platform/observability.interceptor.j
     ReportingService,
     GovernanceService,
     MetricsService,
+    AdministrationService,
+    BreakGlassService,
     { provide: APP_GUARD, useClass: SessionGuard },
     { provide: APP_INTERCEPTOR, useClass: ObservabilityInterceptor },
   ],

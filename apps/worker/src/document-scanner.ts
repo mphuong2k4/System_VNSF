@@ -2,9 +2,11 @@ import {
   CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 import { loadConfig } from "@vnsf/config";
+import { createHash } from "node:crypto";
 import { createConnection } from "node:net";
 import type { Pool } from "pg";
 import { parseClamResponse } from "./clam-response.js";
@@ -19,7 +21,7 @@ const storage = new S3Client({
     secretAccessKey: config.OBJECT_STORAGE_SECRET_KEY,
   },
 });
-async function scan(buffer: Buffer) {
+async function scanOnce(buffer: Buffer) {
   return new Promise<"CLEAN" | "INFECTED">((resolve, reject) => {
     const socket = createConnection({
       host: config.CLAMAV_HOST,
@@ -55,17 +57,42 @@ async function scan(buffer: Buffer) {
     });
   });
 }
+async function scan(buffer: Buffer) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 6; attempt += 1) {
+    try {
+      return await scanOnce(buffer);
+    } catch (error) {
+      lastError = error;
+      if (attempt < 6)
+        await new Promise((resolve) =>
+          setTimeout(resolve, 500 * 2 ** (attempt - 1)),
+        );
+    }
+  }
+  throw lastError;
+}
 export async function scanDocument(database: Pool, documentId: string) {
   const result = await database.query<{
     object_key: string;
     completed_at: Date | null;
+    checksum: string;
+    size_bytes: string;
   }>(
-    `SELECT object_key,completed_at FROM documents WHERE id=$1 AND storage_status='QUARANTINED'`,
+    `SELECT object_key,completed_at,checksum,size_bytes FROM documents WHERE id=$1 AND storage_status='QUARANTINED'`,
     [documentId],
   );
   const document = result.rows[0];
   if (!document?.completed_at) throw new Error("DOCUMENT_NOT_READY");
   try {
+    const head = await storage.send(
+      new HeadObjectCommand({
+        Bucket: config.OBJECT_STORAGE_BUCKET,
+        Key: document.object_key,
+      }),
+    );
+    if (Number(head.ContentLength) !== Number(document.size_bytes))
+      throw new Error("FILE_INTEGRITY_MISMATCH");
     const object = await storage.send(
       new GetObjectCommand({
         Bucket: config.OBJECT_STORAGE_BUCKET,
@@ -73,7 +100,12 @@ export async function scanDocument(database: Pool, documentId: string) {
       }),
     );
     const body = Buffer.from(await object.Body!.transformToByteArray());
-    if (body.length > 10_485_760) throw new Error("DOCUMENT_TOO_LARGE");
+    if (
+      body.length !== Number(document.size_bytes) ||
+      body.length > 10_485_760 ||
+      createHash("sha256").update(body).digest("hex") !== document.checksum
+    )
+      throw new Error("FILE_INTEGRITY_MISMATCH");
     const status = await scan(body);
     if (status === "CLEAN") {
       const promotedKey = `clean/${documentId}`;

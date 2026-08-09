@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { fileTypeFromBuffer } from "file-type";
 import { z } from "zod";
 import { DatabaseService } from "../../database/database.service.js";
@@ -154,9 +154,13 @@ export class DocumentsService {
       head.Metadata?.["expected-sha256"] !== document.checksum
     )
       throw new DomainError("FILE_INTEGRITY_MISMATCH", 422);
-    const detected = await fileTypeFromBuffer(
-      await this.storage.prefix(document.object_key),
-    );
+    const content = await this.storage.read(document.object_key);
+    if (
+      content.length !== Number(document.size_bytes) ||
+      createHash("sha256").update(content).digest("hex") !== document.checksum
+    )
+      throw new DomainError("FILE_INTEGRITY_MISMATCH", 422);
+    const detected = await fileTypeFromBuffer(content.subarray(0, 4096));
     if (
       !detected ||
       !allowedMime.has(detected.mime) ||
